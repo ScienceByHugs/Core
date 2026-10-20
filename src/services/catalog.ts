@@ -212,3 +212,27 @@ export async function deleteCatalogProduct(productId: string) {
   if (!data?.success) throw new Error(data?.error || 'Could not delete catalog product')
   return data as { success: true; deletedId: string; deletedName: string }
 }
+
+export type CatalogInventory = { stock_on_hand: number | null; reserved_quantity: number; available_to_sell: number | null; low_stock_threshold: number }
+export type ManagedProduct = CoreCatalogProduct & {
+  publication_status?: 'draft' | 'review' | 'published' | 'archived'
+  is_synthetic?: boolean
+  verification_evidence?: string | null
+  authenticity_verified?: boolean
+  eligibility_verified?: boolean
+  imagery_verified?: boolean
+  inventory?: CatalogInventory | null
+}
+export async function catalogCommand(action: string, body: Record<string, unknown> = {}): Promise<Record<string, any>> {
+  const { data, error } = await supabase.functions.invoke('core-catalog-control', { body: { action, ...body } })
+  if (error) {
+    const context = (error as { context?: Response }).context
+    if (context) {
+      const detail = await context.clone().json().catch(() => null)
+      if (detail?.error) throw new Error(detail.error)
+    }
+    throw error
+  }
+  if (!data?.success) throw new Error(data?.error || 'The change could not be saved.')
+  return data
+}

@@ -1,524 +1,106 @@
-import { deleteCatalogProduct, loadCoreCatalog, setCatalogVisibility, syncCatalogNow, updateCatalogMetadata, type CoreCatalogProduct } from './services/catalog'
+import { catalogCommand, loadCoreCatalog, type CoreCatalogCategory, type ManagedProduct } from './services/catalog'
+import './catalog-management.css'
 
-const CATALOG_VIEW_STATE_KEY = 'sciencebyhugs-core:catalog-view-state'
-
-type CatalogViewState = {
-  search: string
-  category: string
-  state: string
-}
-
-function loadCatalogViewState(): CatalogViewState {
-  try {
-    const raw = sessionStorage.getItem(CATALOG_VIEW_STATE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<CatalogViewState>
-      return {
-        search: typeof parsed.search === 'string' ? parsed.search : '',
-        category: typeof parsed.category === 'string' ? parsed.category : 'all',
-        state: typeof parsed.state === 'string' ? parsed.state : 'all',
-      }
-    }
-  } catch {
-    // Fall back to defaults if session storage is unavailable.
-  }
-  return { search: '', category: 'all', state: 'all' }
-}
-
-function saveCatalogViewState(value: CatalogViewState) {
-  try {
-    sessionStorage.setItem(CATALOG_VIEW_STATE_KEY, JSON.stringify(value))
-  } catch {
-    // The current view still works even if storage is unavailable.
-  }
-}
-
-type Helpers = {
-  escapeHtml: (value: unknown) => string
-  money: (value: number | string | null | undefined) => string
-  dateTime: (value: string | null | undefined) => string
-}
-
-function productCard(product: CoreCatalogProduct, helpers: Helpers) {
-  const { escapeHtml, money, dateTime } = helpers
-  const identifier = product.product_code || product.sku || product.source_key || 'No code'
-
-  return '<article class="catalog-card" data-product-id="' + escapeHtml(product.id) + '">' +
-    '<div class="catalog-card-head">' +
-      '<div><span class="eyebrow">' + escapeHtml(identifier) + '</span>' +
-      '<h2>' + escapeHtml(product.name) + '</h2>' +
-      '<p>' + escapeHtml(product.product_type || 'Unclassified') + ' · ' +
-        escapeHtml(product.category?.name || 'No category') + '</p></div>' +
-      '<div class="catalog-tags">' +
-        '<span class="catalog-status ' + (product.active ? 'active' : 'inactive') + '">' + (product.active ? 'Active' : 'Inactive') + '</span>' +
-        (product.core_hidden ? '<span class="catalog-status inactive">Hidden from Resident/New</span>' : '') +
-        '<span class="catalog-storefront">' + escapeHtml(product.storefront_status || 'No storefront status') + '</span>' +
-      '</div>' +
-    '</div>' +
-    '<div class="catalog-meta-grid">' +
-      '<div><span>Price</span><strong>' + money(product.price) + '</strong></div>' +
-      '<div><span>Shipping source</span><strong>' + escapeHtml(product.shipping_from || '—') + '</strong></div>' +
-      '<div><span>COA</span><strong>' + (product.coa_url ? 'Available' : 'Missing') + '</strong></div>' +
-      '<div><span>Last sync</span><strong>' + escapeHtml(dateTime(product.source_synced_at)) + '</strong></div>' +
-    '</div>' +
-    '<div class="catalog-detail-row">' +
-      '<span>Research name <strong>' + escapeHtml(product.research_name || '—') + '</strong></span>' +
-      '<span>Purity <strong>' + escapeHtml(product.purity || '—') + '</strong></span>' +
-      '<span>Quantity <strong>' + escapeHtml(product.quantity || '—') + '</strong></span>' +
-      '<span>Lot <strong>' + escapeHtml(product.lot_number || '—') + '</strong></span>' +
-    '</div>' +
-    '<div class="invoice-actions">' +
-      (product.coa_url
-        ? '<a class="button secondary" href="' + escapeHtml(product.coa_url) + '" target="_blank" rel="noreferrer">Open COA</a>'
-        : '') +
-      '<button class="secondary toggle-catalog-visibility" type="button">' +
-        (product.core_hidden ? 'Unhide from Resident/New' : 'Hide from Resident/New') +
-      '</button>' +
-      '<button class="danger delete-catalog-product" type="button"' +
-        (product.active || String(product.storefront_status || '').toLowerCase() === 'available' ? ' disabled title="Active vendor products must be hidden, not deleted."' : '') +
-      '>Delete Product</button>' +
-      '<span class="card-message catalog-visibility-message" aria-live="polite"></span>' +
-    '</div>' +
-    '<details class="catalog-editor"><summary>Edit Core metadata overlay</summary>' +
-      '<p class="catalog-editor-note">Vendor-synced fields stay read-only. These Core metadata fields are separate and persist across vendor catalog syncs.</p>' +
-      '<div class="catalog-editor-grid">' +
-        '<label><span>Product code</span><input class="catalog-product-code" maxlength="120" value="' + escapeHtml(product.product_code || '') + '"></label>' +
-        '<label><span>Research name</span><input class="catalog-research-name" maxlength="200" value="' + escapeHtml(product.research_name || '') + '"></label>' +
-        '<label><span>Purity</span><input class="catalog-purity" maxlength="120" value="' + escapeHtml(product.purity || '') + '"></label>' +
-        '<label><span>Quantity</span><input class="catalog-quantity" maxlength="120" value="' + escapeHtml(product.quantity || '') + '"></label>' +
-        '<label><span>Lot number</span><input class="catalog-lot-number" maxlength="120" value="' + escapeHtml(product.lot_number || '') + '"></label>' +
-        '<label class="catalog-span-2"><span>COA URL</span><input class="catalog-coa-url" type="url" maxlength="1000" value="' + escapeHtml(product.coa_url || '') + '"></label>' +
-      '</div>' +
-      '<div class="catalog-editor-actions"><p class="card-message catalog-editor-message" aria-live="polite"></p>' +
-      '<button class="secondary save-catalog-metadata" type="button">Save Metadata</button></div>' +
-    '</details>' +
-  '</article>'
-}
+type Helpers = { escapeHtml: (value: unknown) => string; money: (value: number | string | null | undefined) => string; dateTime: (value: string | null | undefined) => string }
+const state = { search: '', category: '', status: '' }
 
 export function catalogPageMarkup(email: string, escapeHtml: Helpers['escapeHtml']) {
-  return '<section class="dashboard-head dashboard-head-compact"><div>' +
-    '<span class="eyebrow">PRODUCT OPERATIONS</span><h1 class="dashboard-title">Catalog</h1>' +
-    '<p class="copy">Operational visibility into product status, category, storefront state, sourcing, COA coverage, and catalog sync health.</p>' +
-    '</div><div class="operator">Signed in as <strong>' + escapeHtml(email) + '</strong></div></section>' +
-    '<section class="catalog-sync-now-card">' +
-      '<div><span class="eyebrow">LIVE CATALOG</span><h2>Sync Google Sheet now</h2>' +
-      '<p>Push the latest Catalog tab into Supabase immediately instead of waiting for the hourly sync.</p></div>' +
-      '<div class="catalog-sync-now-actions"><span id="catalog-sync-now-status" aria-live="polite"></span>' +
-      '<button class="primary" id="catalog-sync-now" type="button">Sync Catalog Now</button></div>' +
-    '</section>' +
-    '<section class="catalog-metrics" id="catalog-metrics"></section>' +
-    '<section class="catalog-ops-grid">' +
-      '<div class="catalog-ops-panel" id="catalog-feed-health"></div>' +
-      '<div class="catalog-ops-panel" id="catalog-metadata-health"></div>' +
-    '</section>' +
-    '<section class="catalog-queue-panel" id="catalog-action-queue"></section>' +
-    '<section class="catalog-queue-panel" id="catalog-discrepancies"></section>' +
-    '<section class="catalog-toolbar"><label class="queue-search"><span class="sr-only">Search catalog</span>' +
-    '<input id="catalog-search" type="search" placeholder="Search product, type, code, category…" autocomplete="off"></label>' +
-    '<select id="catalog-category" aria-label="Filter catalog by category"><option value="all">All categories</option></select>' +
-    '<select id="catalog-state" aria-label="Filter catalog by state">' +
-      '<option value="all">All states</option><option value="active">Active</option><option value="inactive">Inactive</option>' +
-      '<option value="metadata-incomplete">Metadata incomplete</option><option value="coa-missing">Missing COA</option>' +
-      '<option value="vendor-discrepancy">Vendor discrepancy</option><option value="uncategorized">Uncategorized</option>' +
-    '</select></section>' +
-    '<p class="queue-summary" id="catalog-summary" aria-live="polite"></p>' +
-    '<section class="catalog-sync" id="catalog-sync"></section>' +
-    '<section class="catalog-list" id="catalog-list"><div class="loading">Loading catalog…</div></section>'
+  return `<section class="dashboard-head dashboard-head-compact"><div><span class="eyebrow">PRODUCT OPERATIONS</span><h1 class="dashboard-title">Catalog & inventory</h1><p class="copy">Manage product information, verified publication and auditable stock.</p></div><div class="operator">Signed in as <strong>${escapeHtml(email)}</strong></div></section>
+  <div class="catalog-management"><div class="catalog-management-actions"><button id="catalog-create" type="button">Create draft product</button><button id="catalog-category-create" class="secondary" type="button">Manage categories</button><button id="catalog-refresh" class="secondary" type="button">Refresh</button></div>
+  <p class="catalog-notice">Staging operations. Drafts and unverified products stay unpublished. Package size is separate from stock. Each sellable variant requires its own SKU.</p><p id="catalog-message" role="status" aria-live="polite"></p>
+  <section id="catalog-editor-panel"></section><section class="catalog-metrics" id="catalog-metrics"></section>
+  <section class="catalog-toolbar"><label><span class="sr-only">Search products</span><input id="catalog-search" type="search" placeholder="Search name or SKU"></label><select id="catalog-category" aria-label="Category"><option value="">All categories</option></select><select id="catalog-state" aria-label="Publication or inventory status"><option value="">All states</option><option>draft</option><option>review</option><option>published</option><option>archived</option><option value="low">Low stock</option><option value="out">Out of stock</option><option value="unknown">Unknown stock</option></select></section><p id="catalog-summary" aria-live="polite"></p><section class="catalog-list" id="catalog-list"><p role="status">Loading catalog…</p></section></div>`
 }
 
-export async function bindCatalogPage(helpers: Helpers) {
-  const list = document.querySelector<HTMLDivElement>('#catalog-list')
-  if (!list) return
-
-  const syncButton = document.querySelector<HTMLButtonElement>('#catalog-sync-now')
-  const syncStatus = document.querySelector<HTMLSpanElement>('#catalog-sync-now-status')
-
-  if (syncButton) syncButton.onclick = async () => {
-    if (syncButton.disabled) return
-    syncButton.disabled = true
-    syncButton.textContent = 'Syncing…'
-    if (syncStatus) syncStatus.textContent = 'Reading the Google Sheet and updating Nexus catalog…'
-
-    try {
-      const result = await syncCatalogNow()
-      const sync = result.sync
-      if (syncStatus) {
-        syncStatus.textContent = sync
-          ? 'Synced ' + (sync.upserted_count ?? 0) + ' products. Refreshing catalog…'
-          : 'Sync completed. Refreshing catalog…'
-      }
-      await bindCatalogPage(helpers)
-    } catch (error) {
-      if (syncStatus) syncStatus.textContent = error instanceof Error ? error.message : 'Catalog sync failed.'
-    } finally {
-      syncButton.disabled = false
-      syncButton.textContent = 'Sync Catalog Now'
+export async function bindCatalogPage(h: Helpers) {
+  const candidate = document.querySelector<HTMLElement>('.catalog-management')
+  if (!candidate) return
+  const root: HTMLElement = candidate
+  const el = <T extends Element = HTMLElement>(selector: string) => root.querySelector<T>(selector)!
+  const e = h.escapeHtml
+  const message = el('#catalog-message')
+  const panel = el('#catalog-editor-panel')
+  let products: ManagedProduct[] = []
+  let categories: CoreCatalogCategory[] = []
+  const categoryOptions = (id: string | null = '') => '<option value="">Choose category</option>' + categories.map(c => `<option value="${e(c.id)}" ${c.id === id ? 'selected' : ''}>${e(c.name)}${c.active ? '' : ' (inactive)'}</option>`).join('')
+  const input = (label: string, name: string, value: unknown = '', attrs = '') => `<label><span>${label}</span><input name="${name}" value="${e(value ?? '')}" ${attrs}></label>`
+  const run = async (button: HTMLButtonElement, action: string, body: Record<string, unknown>, success: string) => {
+    button.disabled = true
+    message.textContent = 'Saving…'
+    try { const result = await catalogCommand(action, body); try { await refresh(); message.textContent = success } catch { message.textContent = success + ' Catalog refresh failed; use Refresh to reload the saved state.' } return result }
+    catch (error) { message.textContent = error instanceof Error ? error.message : 'Unable to save. Please try again.'; return null }
+    finally { button.disabled = false }
+  }
+  function edit(product?: ManagedProduct) {
+    panel.innerHTML = `<form class="catalog-admin-form"><h2>${product ? 'Edit product' : 'Create draft product'}</h2><p>Saving information returns this item to draft and clears verification. Publication requires a separate review.</p><div class="catalog-editor-grid">
+    ${input('Product name', 'name', product?.name, 'required maxlength="200"')}${input('Unique SKU / variant SKU', 'sku', product?.sku, 'required maxlength="120"')}
+    <label><span>Category</span><select name="category_id">${categoryOptions(product?.category_id)}</select></label>${input('Selling price (USD)', 'price', product?.price, 'type="number" required min="0.01" step="0.01"')}
+    ${input('Variant / package size (not stock)', 'quantity', product?.quantity, 'maxlength="120"')}${input('Authorized image URL', 'image_url', product?.image_url, 'type="url" maxlength="2000" placeholder="https://…"')}
+    <label class="catalog-span-2"><span>Description</span><textarea name="description" rows="4" maxlength="5000">${e(product?.description || '')}</textarea></label><label class="catalog-check"><input name="featured" type="checkbox" ${product?.featured ? 'checked' : ''}> Featured after publication</label></div><div class="catalog-management-actions"><button type="submit">Save draft</button><button type="button" data-close class="secondary">Cancel</button></div></form>`
+    const form = panel.querySelector('form')!
+    form.onsubmit = async event => {
+      event.preventDefault()
+      const data = new FormData(form)
+      const productData = Object.fromEntries(data)
+      const result = await run(form.querySelector('button')!, 'save_product', { ...(product ? { productId: product.id } : {}), product: { ...productData, category_id: data.get('category_id') || null, price: Number(data.get('price')), featured: data.has('featured') } }, 'Draft saved. Review information, stock and eligibility before publication.')
+      if (result) panel.innerHTML = ''
+    }
+    panel.querySelector<HTMLButtonElement>('[data-close]')!.onclick = () => { panel.innerHTML = '' }
+    panel.querySelector<HTMLInputElement>('input')?.focus()
+    panel.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }
+  function inventory(product: ManagedProduct) {
+    const stock = product.inventory
+    panel.innerHTML = `<form class="catalog-admin-form"><h2>Inventory · ${e(product.name)}</h2><p>Reserved: ${stock?.reserved_quantity ?? 0}. Available to sell: ${stock?.available_to_sell ?? 'unknown'}. Stock cannot be reduced below reservations.</p><div class="catalog-editor-grid">${input('Physical units on hand', 'stockOnHand', stock?.stock_on_hand, 'type="number" min="0" step="1" required')}${input('Low-stock threshold', 'lowStockThreshold', stock?.low_stock_threshold ?? 0, 'type="number" min="0" step="1" required')}${input('Reason for adjustment', 'reason', '', 'required minlength="3" maxlength="500"')}</div><div class="catalog-management-actions"><button>Record adjustment</button><button type="button" data-close class="secondary">Cancel</button></div></form>`
+    const form = panel.querySelector('form')!
+    form.onsubmit = async event => { event.preventDefault(); const data = new FormData(form); if (await run(form.querySelector('button')!, 'adjust_inventory', { productId: product.id, stockOnHand: Number(data.get('stockOnHand')), lowStockThreshold: Number(data.get('lowStockThreshold')), reason: data.get('reason') }, 'Inventory adjustment saved. Availability refreshed.')) panel.innerHTML = '' }
+    panel.querySelector<HTMLButtonElement>('[data-close]')!.onclick = () => { panel.innerHTML = '' }
+    panel.scrollIntoView({ block: 'start' })
+  }
+  function publication(product: ManagedProduct) {
+    panel.innerHTML = `<form class="catalog-admin-form"><h2>Publication review · ${e(product.name)}</h2><p>Only verify facts supported by evidence. Research-only wording does not establish legal or platform eligibility. Synthetic fixtures remain isolated from the genuine catalog.</p><label><span>Publication state</span><select name="status">${['draft', 'review', 'published', 'archived'].map(s => `<option ${s === product.publication_status ? 'selected' : ''}>${s}</option>`).join('')}</select></label><div class="catalog-review-checks">${[['authenticity','Authenticity and product details verified'],['eligibility','Legal, platform and payment eligibility reviewed'],['imagery','Image rights and accurate representation verified']].map(([key,label]) => `<label class="catalog-check"><input type="checkbox" name="${key}"> ${label}</label>`).join('')}</div><label><span>Review evidence and source references</span><textarea name="evidence" rows="4" maxlength="5000">${e(product.verification_evidence || '')}</textarea></label><div class="catalog-management-actions"><button>Save publication state</button><button type="button" data-close class="secondary">Cancel</button></div></form>`
+    const form = panel.querySelector('form')!
+    form.onsubmit = async event => { event.preventDefault(); const data = new FormData(form); if (data.get('status') === 'published' && (!data.has('authenticity') || !data.has('eligibility') || !data.has('imagery') || !String(data.get('evidence')).trim())) { message.textContent = 'Publication requires all three verifications and evidence.'; return } if (await run(form.querySelector('button')!, 'set_publication', { productId: product.id, status: data.get('status'), verification: { authenticity: data.has('authenticity'), eligibility: data.has('eligibility'), imagery: data.has('imagery'), evidence: data.get('evidence') } }, 'Publication state saved. The server verified publication requirements.')) panel.innerHTML = '' }
+    panel.querySelector<HTMLButtonElement>('[data-close]')!.onclick = () => { panel.innerHTML = '' }
+    panel.scrollIntoView({ block: 'start' })
+  }
+  function render() {
+    const filtered = products.filter(p => (!state.search || [p.name,p.sku,p.quantity].join(' ').toLowerCase().includes(state.search.toLowerCase())) && (!state.category || p.category_id === state.category) && (!state.status || p.publication_status === state.status || (state.status === 'unknown' && p.inventory?.stock_on_hand == null) || (state.status === 'out' && p.inventory?.available_to_sell === 0) || (state.status === 'low' && p.inventory?.available_to_sell != null && p.inventory.available_to_sell <= p.inventory.low_stock_threshold)))
+    el('#catalog-summary').textContent = `${filtered.length} of ${products.length} products`
+    el('#catalog-list').innerHTML = filtered.length ? filtered.map(p => `<article class="catalog-card" data-id="${e(p.id)}"><div class="catalog-card-head"><div><span class="eyebrow">${e(p.sku || 'SKU required')}</span><h2>${e(p.name)}</h2><p>${e(p.category?.name || 'Uncategorized')} · ${e(p.quantity || 'No variant label')}</p></div><span class="catalog-status">${e(p.publication_status || 'draft')}${p.is_synthetic ? ' · synthetic' : ''}</span></div><div class="catalog-meta-grid"><div><span>Price</span><strong>${h.money(p.price)}</strong></div><div><span>On hand</span><strong>${p.inventory?.stock_on_hand ?? 'Unknown'}</strong></div><div><span>Reserved</span><strong>${p.inventory?.reserved_quantity ?? 0}</strong></div><div><span>Available to sell</span><strong>${p.inventory?.available_to_sell ?? 'Unknown'}</strong></div></div><div class="catalog-management-actions"><button class="secondary" data-action="edit">Edit product</button><button class="secondary" data-action="inventory">Adjust stock</button><button class="secondary" data-action="publication">Review publication</button><button class="secondary" data-action="history">History</button></div><div class="catalog-history" aria-live="polite"></div></article>`).join('') : '<div class="empty-state"><h2>No matching products</h2><p>Create a draft or change your filters.</p></div>'
+  }
+  async function refresh() {
+    const data = await loadCoreCatalog(); if (!root.isConnected) return
+    products = data.products; categories = data.categories
+    el<HTMLSelectElement>('#catalog-category').innerHTML = '<option value="">All categories</option>' + categories.map(c => `<option value="${e(c.id)}">${e(c.name)}</option>`).join('')
+    el<HTMLSelectElement>('#catalog-category').value = state.category
+    el('#catalog-metrics').innerHTML = [['Products', products.length],['Published', products.filter(p => p.publication_status === 'published').length],['Awaiting review',products.filter(p => p.publication_status === 'review').length],['Unknown stock',products.filter(p => p.inventory?.stock_on_hand == null).length]].map(([label,value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join('')
+    render()
+  }
+  el<HTMLButtonElement>('#catalog-create').onclick = () => edit()
+  el<HTMLButtonElement>('#catalog-refresh').onclick = async () => { try { await refresh(); message.textContent = 'Catalog refreshed.' } catch (error) { message.textContent = String(error) } }
+  el<HTMLButtonElement>('#catalog-category-create').onclick = () => {
+    panel.innerHTML = `<form class="catalog-admin-form"><h2>Manage categories</h2><label><span>Category</span><select name="id"><option value="">New category</option>${categories.map(c => `<option value="${e(c.id)}">${e(c.name)}</option>`).join('')}</select></label><div class="catalog-editor-grid">${input('Name','name','','required maxlength="100"')}${input('URL slug','slug','','required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="100"')}${input('Description','description','','maxlength="1000"')}<label class="catalog-check"><input type="checkbox" name="active" checked> Active category</label></div><div class="catalog-management-actions"><button>Save category</button><button type="button" data-close class="secondary">Cancel</button></div></form>`
+    const form = panel.querySelector('form')!
+    form.querySelector<HTMLSelectElement>('select')!.onchange = event => { const category = categories.find(c => c.id === (event.target as HTMLSelectElement).value); for (const key of ['name','slug','description'] as const) form.querySelector<HTMLInputElement>(`[name="${key}"]`)!.value = category?.[key] || ''; form.querySelector<HTMLInputElement>('[name="active"]')!.checked = category?.active ?? true }
+    form.onsubmit = async event => { event.preventDefault(); const data = new FormData(form); if (await run(form.querySelector('button')!, 'save_category', { categoryId: data.get('id') || undefined, category: { name: data.get('name'), slug: data.get('slug'), description: data.get('description'), active: data.has('active') } }, 'Category saved.')) panel.innerHTML = '' }
+    panel.querySelector<HTMLButtonElement>('[data-close]')!.onclick = () => { panel.innerHTML = '' }
+  }
+  el<HTMLInputElement>('#catalog-search').value = state.search
+  el<HTMLInputElement>('#catalog-search').oninput = event => { state.search = (event.target as HTMLInputElement).value; render() }
+  el<HTMLSelectElement>('#catalog-category').onchange = event => { state.category = (event.target as HTMLSelectElement).value; render() }
+  el<HTMLSelectElement>('#catalog-state').value = state.status
+  el<HTMLSelectElement>('#catalog-state').onchange = event => { state.status = (event.target as HTMLSelectElement).value; render() }
+  el('#catalog-list').onclick = async event => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]'); if (!button) return
+    const card = button.closest<HTMLElement>('[data-id]')!; const product = products.find(p => p.id === card.dataset.id); if (!product) return
+    if (button.dataset.action === 'edit') edit(product)
+    if (button.dataset.action === 'inventory') inventory(product)
+    if (button.dataset.action === 'publication') publication(product)
+    if (button.dataset.action === 'history') {
+      const history = card.querySelector<HTMLElement>('.catalog-history')!; history.textContent = 'Loading history…'; button.disabled = true
+      try { const data = await catalogCommand('history', { productId: product.id }); const events = data.events as Record<string, unknown>[]; history.innerHTML = events.length ? `<ol>${events.map(item => `<li><strong>${e(item.action || item.event_type || 'Change')}</strong> · ${e(h.dateTime(String(item.created_at || '')))}<pre>${e(JSON.stringify({ before: item.before_data, after: item.after_data, metadata: item.metadata }, null, 2))}</pre></li>`).join('')}</ol>` : '<p>No recorded changes.</p>' } catch (error) { history.textContent = error instanceof Error ? error.message : 'Unable to load history.' } finally { button.disabled = false }
     }
   }
-
-  try {
-    const payload = await loadCoreCatalog()
-    const { products, categories, metrics, operations, sync_runs: syncRuns } = payload
-
-    const metricEl = document.querySelector<HTMLDivElement>('#catalog-metrics')
-    if (metricEl) {
-      metricEl.innerHTML =
-        '<div><span>Total</span><strong>' + metrics.total + '</strong></div>' +
-        '<div><span>Active</span><strong>' + metrics.active + '</strong></div>' +
-        '<div><span>Available on Nexus</span><strong>' + metrics.available + '</strong></div>' +
-        '<div><span>Hidden from Resident/New</span><strong>' + metrics.hidden + '</strong></div>' +
-        '<div><span>Metadata complete</span><strong>' + metrics.metadata_complete + '/' + metrics.active + '</strong></div>' +
-        '<div><span>Completeness</span><strong>' + metrics.metadata_completeness_percent + '%</strong></div>' +
-        '<div><span>Work queue</span><strong>' + metrics.action_queue + '</strong></div>' +
-        '<div><span>Vendor exceptions</span><strong>' + metrics.discrepancy_count + '</strong></div>'
-    }
-
-    const feedEl = document.querySelector<HTMLDivElement>('#catalog-feed-health')
-    if (feedEl) {
-      const feed = operations.feed
-      feedEl.classList.toggle('attention', feed.stale)
-      feedEl.innerHTML =
-        '<div class="catalog-ops-head"><div><span class="eyebrow">VENDOR FEED</span>' +
-        '<h2>' + (feed.stale ? 'Needs attention' : 'Healthy') + '</h2></div>' +
-        '<span class="catalog-health-pill ' + (feed.stale ? 'attention' : 'healthy') + '">' +
-        (feed.stale ? 'STALE' : 'LIVE') + '</span></div>' +
-        '<p>Latest sync: <strong>' + helpers.escapeHtml(helpers.dateTime(feed.latest_sync_at)) + '</strong></p>' +
-        '<div class="catalog-ops-stats">' +
-          '<span>Age <strong>' + (feed.age_minutes ?? '—') + ' min</strong></span>' +
-          '<span>Received <strong>' + (feed.latest_received_count ?? '—') + '</strong></span>' +
-          '<span>Upserted <strong>' + (feed.latest_upserted_count ?? '—') + '</strong></span>' +
-          '<span>Recent success <strong>' + feed.recent_successful_runs + '/' + feed.recent_run_count + '</strong></span>' +
-        '</div>' +
-        '<small>Vendor feed remains the source of truth. Core flags it stale after ' +
-        feed.stale_after_minutes + ' minutes without a successful refresh.</small>'
-    }
-
-    const metadataEl = document.querySelector<HTMLDivElement>('#catalog-metadata-health')
-    if (metadataEl) {
-      const missing = operations.metadata.missing
-      metadataEl.innerHTML =
-        '<div class="catalog-ops-head"><div><span class="eyebrow">CORE METADATA</span>' +
-        '<h2>' + operations.metadata.completeness_percent + '% complete</h2></div>' +
-        '<span class="catalog-health-pill">' + operations.metadata.complete_products + '/' +
-        operations.metadata.active_products + ' COMPLETE</span></div>' +
-        '<div class="catalog-missing-grid">' +
-          '<button type="button" data-ops-filter="coa-missing"><span>COA</span><strong>' + (missing.coa_url ?? 0) + '</strong></button>' +
-          '<button type="button" data-ops-filter="metadata-incomplete"><span>Product code</span><strong>' + (missing.product_code ?? 0) + '</strong></button>' +
-          '<button type="button" data-ops-filter="metadata-incomplete"><span>Research name</span><strong>' + (missing.research_name ?? 0) + '</strong></button>' +
-          '<button type="button" data-ops-filter="metadata-incomplete"><span>Purity</span><strong>' + (missing.purity ?? 0) + '</strong></button>' +
-          '<button type="button" data-ops-filter="metadata-incomplete"><span>Quantity</span><strong>' + (missing.quantity ?? 0) + '</strong></button>' +
-          '<button type="button" data-ops-filter="metadata-incomplete"><span>Lot</span><strong>' + (missing.lot_number ?? 0) + '</strong></button>' +
-        '</div>'
-    }
-
-    const queueEl = document.querySelector<HTMLDivElement>('#catalog-action-queue')
-    if (queueEl) {
-      const rows = operations.action_queue.slice(0, 12)
-      queueEl.innerHTML =
-        '<div class="catalog-queue-head"><div><span class="eyebrow">ACTION QUEUE</span>' +
-        '<h2>Core metadata work</h2><p>Vendor-safe fields that can be completed in Core.</p></div>' +
-        '<strong>' + operations.action_queue.length + ' products</strong></div>' +
-        (rows.length
-          ? '<div class="catalog-queue-list">' + rows.map(item =>
-              '<button type="button" class="catalog-queue-row jump-to-product" data-product-id="' +
-              helpers.escapeHtml(item.product_id) + '">' +
-                '<span><strong>' + helpers.escapeHtml(item.name) + '</strong><small>' +
-                helpers.escapeHtml(item.category_name || 'No vendor category') + '</small></span>' +
-                '<span class="catalog-missing-chips">' +
-                  item.missing_fields.map(field => '<i>' + helpers.escapeHtml(field.label) + '</i>').join('') +
-                '</span>' +
-                '<b>' + item.missing_count + '</b>' +
-              '</button>'
-            ).join('') + '</div>' +
-            (operations.action_queue.length > rows.length
-              ? '<p class="catalog-queue-more">Showing the first ' + rows.length +
-                '. Use “Metadata incomplete” to view the full queue.</p>' : '')
-          : '<div class="empty-state compact"><strong>Metadata queue clear.</strong></div>')
-    }
-
-    const discrepancyEl = document.querySelector<HTMLDivElement>('#catalog-discrepancies')
-    if (discrepancyEl) {
-      const rows = operations.discrepancies.slice(0, 10)
-      discrepancyEl.classList.toggle('has-items', rows.length > 0)
-      discrepancyEl.innerHTML =
-        '<div class="catalog-queue-head"><div><span class="eyebrow">VENDOR EXCEPTIONS</span>' +
-        '<h2>Feed discrepancies</h2><p>Investigate these without overriding vendor-owned fields.</p></div>' +
-        '<strong>' + operations.discrepancies.length + ' exceptions</strong></div>' +
-        (rows.length
-          ? '<div class="catalog-queue-list">' + rows.map(item =>
-              '<button type="button" class="catalog-queue-row jump-to-product" data-product-id="' +
-              helpers.escapeHtml(item.product_id) + '">' +
-                '<span><strong>' + helpers.escapeHtml(item.name) + '</strong><small>' +
-                helpers.escapeHtml(item.category_name || 'No vendor category') + '</small></span>' +
-                '<span class="catalog-issue-copy">' + helpers.escapeHtml(item.issues.join(' · ')) + '</span>' +
-                '<b>!</b>' +
-              '</button>'
-            ).join('') + '</div>'
-          : '<div class="empty-state compact"><strong>No vendor-feed discrepancies detected.</strong></div>')
-    }
-
-    const syncEl = document.querySelector<HTMLDivElement>('#catalog-sync')
-    if (syncEl) {
-      const rows = syncRuns.slice(0, 6)
-      syncEl.innerHTML =
-        '<div><span class="eyebrow">SYNC HISTORY</span><strong>Vendor catalog refreshes</strong>' +
-        '<p>Read-only history from the vendor-backed Google catalog sync.</p>' +
-        (rows.length
-          ? '<div class="catalog-sync-history">' + rows.map(run =>
-              '<div class="catalog-sync-row">' +
-                '<strong class="' + (run.status.toLowerCase() === 'completed' ? 'success' : 'failure') + '">' +
-                  helpers.escapeHtml(run.status) + '</strong>' +
-                '<span>' + helpers.escapeHtml(helpers.dateTime(run.completed_at || run.started_at)) + '</span>' +
-                '<span>' + (run.received_count ?? 0) + ' received · ' + (run.upserted_count ?? 0) + ' upserted</span>' +
-                '<span>' + (run.deactivated_count ?? 0) + ' deactivated</span>' +
-              '</div>'
-            ).join('') + '</div>'
-          : '<div class="empty-state compact"><strong>No sync history yet.</strong></div>') +
-        '</div>'
-    }
-
-    list.innerHTML = products.length
-      ? products.map(product => productCard(product, helpers)).join('')
-      : '<div class="empty-state"><h2>No products found.</h2></div>'
-
-    const categorySelect = document.querySelector<HTMLSelectElement>('#catalog-category')
-    if (categorySelect) {
-      categorySelect.insertAdjacentHTML('beforeend', categories.map(category =>
-        '<option value="' + helpers.escapeHtml(category.slug) + '">' + helpers.escapeHtml(category.name) + '</option>'
-      ).join(''))
-    }
-
-    const savedViewState = loadCatalogViewState()
-    let search = savedViewState.search
-    let category = savedViewState.category
-    let state = savedViewState.state
-
-    const searchInput = document.querySelector<HTMLInputElement>('#catalog-search')
-    const stateSelect = document.querySelector<HTMLSelectElement>('#catalog-state')
-
-    if (searchInput) searchInput.value = search
-    if (categorySelect && Array.from(categorySelect.options).some(option => option.value === category)) {
-      categorySelect.value = category
-    } else {
-      category = 'all'
-      if (categorySelect) categorySelect.value = 'all'
-    }
-    if (stateSelect && Array.from(stateSelect.options).some(option => option.value === state)) {
-      stateSelect.value = state
-    } else {
-      state = 'all'
-      if (stateSelect) stateSelect.value = 'all'
-    }
-    const metadataQueueIds = new Set(operations.action_queue.map(item => item.product_id))
-    const discrepancyIds = new Set(operations.discrepancies.map(item => item.product_id))
-
-    const apply = () => {
-      let shown = 0
-      document.querySelectorAll<HTMLElement>('.catalog-card').forEach(card => {
-        const product = products.find(item => item.id === card.dataset.productId)
-        if (!product) return
-        const haystack = [
-          product.name, product.research_name, product.product_code, product.sku,
-          product.source_key, product.product_type, product.category?.name,
-          product.shipping_from, product.storefront_status
-        ].filter(Boolean).join(' ').toLowerCase()
-
-        const categoryMatch = category === 'all' || product.category?.slug === category
-        const stateMatch =
-          state === 'all' ||
-          (state === 'active' && product.active) ||
-          (state === 'inactive' && (!product.active || product.core_hidden)) ||
-          (state === 'metadata-incomplete' && metadataQueueIds.has(product.id)) ||
-          (state === 'coa-missing' && !product.coa_url) ||
-          (state === 'vendor-discrepancy' && discrepancyIds.has(product.id)) ||
-          (state === 'uncategorized' && !product.category_id)
-        const visible = categoryMatch && stateMatch && (!search || haystack.includes(search))
-        card.hidden = !visible
-        if (visible) shown += 1
-      })
-
-      const summary = document.querySelector<HTMLParagraphElement>('#catalog-summary')
-      if (summary) summary.textContent = shown + ' of ' + products.length + ' products shown.'
-    }
-
-    document.querySelectorAll<HTMLButtonElement>('.toggle-catalog-visibility').forEach(button => {
-      button.addEventListener('click', async () => {
-        const card = button.closest<HTMLElement>('.catalog-card')
-        const productId = card?.dataset.productId
-        const message = card?.querySelector<HTMLSpanElement>('.catalog-visibility-message')
-        if (!productId) return
-
-        const product = products.find(item => item.id === productId)
-        if (!product) return
-
-        const nextHidden = !product.core_hidden
-        button.disabled = true
-        button.textContent = nextHidden ? 'Disabling…' : 'Enabling…'
-        if (message) message.textContent = nextHidden
-          ? 'Hiding product from Resident Scientist and New Researcher…'
-          : 'Restoring product for all eligible membership tiers…'
-
-        try {
-          const updated = await setCatalogVisibility(productId, nextHidden)
-          product.core_hidden = updated.core_hidden
-          product.updated_at = updated.updated_at
-          if (message) message.textContent = updated.core_hidden
-            ? 'Hidden from Resident Scientist and New Researcher. Audit event recorded.'
-            : 'Visible to eligible membership tiers again. Audit event recorded.'
-          await bindCatalogPage(helpers)
-        } catch (error) {
-          if (message) message.textContent = error instanceof Error
-            ? error.message
-            : 'Could not update storefront visibility.'
-          button.disabled = false
-          button.textContent = product.core_hidden ? 'Unhide from Resident/New' : 'Hide from Resident/New'
-        }
-      })
-    })
-
-    document.querySelectorAll<HTMLButtonElement>('.delete-catalog-product').forEach(button => {
-      button.addEventListener('click', async () => {
-        const card = button.closest<HTMLElement>('.catalog-card')
-        const productId = card?.dataset.productId
-        const message = card?.querySelector<HTMLSpanElement>('.catalog-visibility-message')
-        if (!productId) return
-
-        const product = products.find(item => item.id === productId)
-        if (!product) return
-
-        if (product.active || String(product.storefront_status || '').toLowerCase() === 'available') {
-          if (message) message.textContent = 'This product is still on the active vendor catalog. Hide it instead.'
-          return
-        }
-
-        const confirmed = window.confirm(
-          'Delete "' + product.name + '" from CORE/NEXUS?\n\nThis is intended only for products no longer present on the vendor catalog. Historical order line items will keep their product name and price.'
-        )
-        if (!confirmed) return
-
-        button.disabled = true
-        button.textContent = 'Deleting…'
-        if (message) message.textContent = 'Removing product from CORE/NEXUS…'
-
-        try {
-          const deleted = await deleteCatalogProduct(productId)
-          if (message) message.textContent = deleted.deletedName + ' deleted. Audit event recorded.'
-          await bindCatalogPage(helpers)
-        } catch (error) {
-          if (message) message.textContent = error instanceof Error ? error.message : 'Could not delete product.'
-          button.disabled = false
-          button.textContent = 'Delete Product'
-        }
-      })
-    })
-
-    document.querySelectorAll<HTMLButtonElement>('.save-catalog-metadata').forEach(button => {
-      button.addEventListener('click', async () => {
-        const card = button.closest<HTMLElement>('.catalog-card')
-        const productId = card?.dataset.productId
-        const message = card?.querySelector<HTMLParagraphElement>('.catalog-editor-message')
-        if (!productId) return
-
-        const product = products.find(item => item.id === productId)
-        if (!product) return
-
-        const value = (selector: string) =>
-          card?.querySelector<HTMLInputElement>(selector)?.value.trim() || ''
-
-        const payload = {
-          productCode: value('.catalog-product-code'),
-          researchName: value('.catalog-research-name'),
-          purity: value('.catalog-purity'),
-          quantity: value('.catalog-quantity'),
-          lotNumber: value('.catalog-lot-number'),
-          coaUrl: value('.catalog-coa-url'),
-        }
-
-        button.disabled = true
-        button.textContent = 'Saving…'
-        if (message) message.textContent = 'Saving audited catalog metadata…'
-
-        try {
-          const updated = await updateCatalogMetadata(productId, payload)
-          product.product_code = updated.product_code
-          product.research_name = updated.research_name
-          product.purity = updated.purity
-          product.quantity = updated.quantity
-          product.lot_number = updated.lot_number
-          product.coa_url = updated.coa_url
-          product.updated_at = updated.updated_at
-
-          const identifier = updated.product_code || product.sku || product.source_key || 'No code'
-          const eyebrow = card.querySelector<HTMLElement>('.catalog-card-head .eyebrow')
-          if (eyebrow) eyebrow.textContent = identifier
-
-          if (message) message.textContent = 'Saved. Audit event recorded. Refreshing operations…'
-          await bindCatalogPage(helpers)
-        } catch (error) {
-          if (message) message.textContent = error instanceof Error ? error.message : 'Could not save metadata.'
-        } finally {
-          button.disabled = false
-          button.textContent = 'Save Metadata'
-        }
-      })
-    })
-
-    document.querySelectorAll<HTMLButtonElement>('[data-ops-filter]').forEach(button => {
-      button.addEventListener('click', () => {
-        state = button.dataset.opsFilter || 'all'
-        const stateSelect = document.querySelector<HTMLSelectElement>('#catalog-state')
-        if (stateSelect) stateSelect.value = state
-        saveCatalogViewState({ search, category, state })
-        apply()
-        document.querySelector('#catalog-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      })
-    })
-
-    document.querySelectorAll<HTMLButtonElement>('.jump-to-product').forEach(button => {
-      button.addEventListener('click', () => {
-        const productId = button.dataset.productId
-        if (!productId) return
-
-        search = ''
-        category = 'all'
-        state = 'all'
-        const searchInput = document.querySelector<HTMLInputElement>('#catalog-search')
-        const categoryInput = document.querySelector<HTMLSelectElement>('#catalog-category')
-        const stateInput = document.querySelector<HTMLSelectElement>('#catalog-state')
-        if (searchInput) searchInput.value = ''
-        if (categoryInput) categoryInput.value = 'all'
-        if (stateInput) stateInput.value = 'all'
-        saveCatalogViewState({ search, category, state })
-        apply()
-
-        const card = document.querySelector<HTMLElement>('.catalog-card[data-product-id="' + productId + '"]')
-        if (!card) return
-        const editor = card.querySelector<HTMLDetailsElement>('.catalog-editor')
-        if (editor) editor.open = true
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        card.classList.add('catalog-card-focus')
-        window.setTimeout(() => card.classList.remove('catalog-card-focus'), 1800)
-      })
-    })
-
-    document.querySelector<HTMLInputElement>('#catalog-search')?.addEventListener('input', event => {
-      search = (event.currentTarget as HTMLInputElement).value.trim().toLowerCase()
-      saveCatalogViewState({ search, category, state })
-      apply()
-    })
-    categorySelect?.addEventListener('change', event => {
-      category = (event.currentTarget as HTMLSelectElement).value
-      saveCatalogViewState({ search, category, state })
-      apply()
-    })
-    document.querySelector<HTMLSelectElement>('#catalog-state')?.addEventListener('change', event => {
-      state = (event.currentTarget as HTMLSelectElement).value
-      saveCatalogViewState({ search, category, state })
-      apply()
-    })
-    apply()
-  } catch (error) {
-    list.innerHTML = '<div class="empty-state error-state"><h2>Could not load catalog.</h2><p>' +
-      helpers.escapeHtml(error instanceof Error ? error.message : 'Unknown error') + '</p></div>'
-  }
+  try { await refresh() } catch (error) { el('#catalog-list').innerHTML = `<div class="empty-state error-state"><h2>Could not load catalog</h2><p>${e(error instanceof Error ? error.message : 'Unexpected error')}</p><p>Use Refresh to retry.</p></div>` }
 }
