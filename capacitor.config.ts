@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'CORE Staging',
   webDir: 'dist',
   server: { hostname: 'localhost', iosScheme: 'capacitor' },
-  ios: { contentInset: 'automatic' },
+  ios: { contentInset: 'never', backgroundColor: '#07101c' },
 }
 
 export default config

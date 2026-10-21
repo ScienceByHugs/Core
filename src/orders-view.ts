@@ -61,7 +61,9 @@ function orderCard(order: CoreOrder, helpers: Helpers) {
       '<div><span>Contact</span><strong>' + escapeHtml(order.contact_method || order.customer?.preferred_contact_method || '—') + '</strong></div>' +
       '<div><span>Updated</span><strong>' + escapeHtml(dateTime(order.updated_at)) + '</strong></div>' +
     '</div>' +
-    deliveryEstimateEditor(order.id, order.estimated_delivery_date, escapeHtml) +
+    (order.payment_method === 'sandbox'
+      ? '<div class="order-note"><span>Sandbox reservation</span><p>No payment was collected and no fulfillment will be dispatched. The customer can cancel a pending sandbox order from NEXUS to release reserved stock.</p></div>'
+      : deliveryEstimateEditor(order.id, order.estimated_delivery_date, escapeHtml)) +
     '<div class="order-lines">' + (items || '<p class="muted">No line items available.</p>') + '</div>' +
     '<div class="order-timeline">' + timelineHtml + '</div>' +
     (order.fulfillment_note
@@ -92,6 +94,7 @@ export function ordersPageMarkup(email: string, escapeHtml: Helpers['escapeHtml'
       '<input id="orders-search" type="search" placeholder="Search order, customer, email…" autocomplete="off"></label>' +
     '<select id="orders-status" aria-label="Filter orders by status">' +
       '<option value="all">All statuses</option>' +
+      '<option value="pending">Pending sandbox</option>' +
       '<option value="processing">Processing</option>' +
       '<option value="ordered">Ordered</option>' +
       '<option value="shipped">Shipped</option>' +

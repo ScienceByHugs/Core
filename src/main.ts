@@ -183,12 +183,6 @@ function shell(content: string, signedIn = false) {
     app.innerHTML = `
       <a class="skip-link" href="#core-content">Skip to content</a>
       <main class="shell login-shell">
-        <header class="commandbar login-commandbar">
-          <div class="core-brand">
-            <img class="core-brand-lockup" src="${coreLogoUrl}" alt="Core — Science By Hugs" />
-          </div>
-          <span class="status">SYSTEM READY</span>
-        </header>
         <div id="core-content" tabindex="-1">${content}</div>
       </main>
     `
@@ -317,12 +311,11 @@ function renderLogin(message = '') {
     <section class="login-wrap">
       <div class="login-card">
         <img class="core-login-lockup" src="${coreLogoUrl}" alt="Core — Science By Hugs" />
-        <span class="eyebrow">AUTHORIZED PERSONNEL</span>
-        <h1 class="login-title">CORE</h1>
-        <p class="tagline">Control. Operate. Manage.</p>
+        <span class="eyebrow">ADMINISTRATOR ACCESS</span>
+        <h1 class="login-title">Sign in to CORE</h1>
         <p class="copy">Sign in with an authorized Science By Hugs administrator account.</p>
         <form id="login-form" class="login-form">
-          <label>Email<input name="email" type="email" autocomplete="email" required></label>
+          <label>Email<input name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
           <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
           <button class="primary wide" type="submit">Enter Core</button>
         </form>

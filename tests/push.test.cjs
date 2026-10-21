@@ -10,7 +10,7 @@ function load(file, globals) {
   const source = fs.readFileSync(file, 'utf8').replace(/^import .*$/mg, '')
   const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports = {}
-  vm.runInNewContext(js, { exports, URL, Response, Request, atob, console, setTimeout, ...globals })
+  vm.runInNewContext(js, { exports, URL, Response, Request, atob, console, setTimeout, Capacitor: { isNativePlatform: () => false }, ...globals })
   return exports
 }
 const edgeFile = 'supabase/functions/_shared/web-push.ts'

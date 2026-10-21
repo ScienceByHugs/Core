@@ -24,7 +24,7 @@ button,.button,.core-nav,.queue-tab,.status-pill,input,select,textarea{border-co
 .secondary,.core-nav a.active,.queue-tab.active{color:var(--sbh-white);border-color:rgba(0,210,255,.3)}
 .eyebrow,.status,.tagline,.totals .grand,.membership-pill{color:var(--sbh-cyan)}
 
-.core-login-lockup{display:block;width:min(360px,92%);height:auto;margin:0 0 20px}
+.core-login-lockup{display:block;width:180px;max-width:75%;height:auto;margin:0 0 32px}
 .stats>div,.payment-panel,.fulfillment-panel,.catalog-metrics>div,.customer-metrics>div,.customer-details>div,
 .order-meta-grid>div,.order-timeline>div,.referral-kpis>div,.notification-kpis>div,
 .line-item,.order-line,.customer-order-row,.finance-row,.referral-row{
