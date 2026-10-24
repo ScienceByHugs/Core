@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   summary: { flexDirection: 'row', paddingVertical: space[3] },
   summaryCell: { flex: 1, alignItems: 'center', gap: 2 },
   summaryDivided: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.line },
-  summaryValue: { ...type.metric, fontSize: 20, color: colors.text },
+  summaryValue: { ...type.metric, fontSize: 20, color: colors.text, fontVariant: ['tabular-nums'] },
   summaryLabel: { ...type.caption, color: colors.textMuted },
-  available: { ...type.metric, fontSize: 17 },
+  available: { ...type.metric, fontSize: 17, fontVariant: ['tabular-nums'] },
 });

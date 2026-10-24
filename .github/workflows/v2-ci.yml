@@ -64,6 +64,11 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
       - name: Type check
-        run: npx --no-install tsc --noEmit
+        shell: bash
+        run: |
+          set -o pipefail
+          # Report each error with its file and line so it shows on the PR.
+          npx --no-install tsc --noEmit --pretty false \
+            | sed -E 's#^([^(]+)\(([0-9]+),([0-9]+)\): error (TS[0-9]+): (.*)$#::error file=expo/\1,line=\2,col=\3::\4 \5#'
       - name: Compile the iOS bundle (no native build, no upload)
         run: npx --no-install expo export --platform ios --output-dir dist-check

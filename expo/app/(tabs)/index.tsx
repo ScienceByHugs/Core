@@ -129,6 +129,6 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   kpi: { flexGrow: 1, flexBasis: '45%', padding: space[4], gap: space[1] },
   kpiLabel: { ...type.caption, color: colors.textMuted, fontSize: 13 },
-  kpiValue: { ...type.metric, color: colors.text },
+  kpiValue: { ...type.metric, color: colors.text, fontVariant: ['tabular-nums'] },
   kpiNote: { ...type.caption, color: colors.textMuted },
 });

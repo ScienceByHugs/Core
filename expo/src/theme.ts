@@ -25,5 +25,7 @@ export const type = {
   body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   label: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '400' },
-  metric: { fontSize: 22, lineHeight: 28, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  // Add `fontVariant: ['tabular-nums']` in the stylesheet that uses this; a
+  // read-only array here is rejected by React Native's style types.
+  metric: { fontSize: 22, lineHeight: 28, fontWeight: '600' },
 } as const;
