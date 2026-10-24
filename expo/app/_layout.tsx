@@ -20,7 +20,7 @@ function Routes() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" />
       <AuthProvider>
         <Routes />
       </AuthProvider>
