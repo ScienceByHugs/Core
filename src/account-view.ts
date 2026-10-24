@@ -8,7 +8,7 @@ const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c
 
 export function accountScreen(email: string, recovery = false) {
   return `<section class="account-screen" aria-labelledby="account-title">
-    <div class="panel-head account-heading"><div><span class="eyebrow">YOUR CORE</span><h1 class="dashboard-title" id="account-title" tabindex="-1">Account</h1><p class="muted">Your profile, security, and notifications.</p></div></div>
+    <div class="panel-head account-heading"><div><span class="eyebrow">YOUR ACCOUNT</span><h1 class="dashboard-title" id="account-title" tabindex="-1">Account</h1><p class="muted">Your profile, security, and notifications.</p></div></div>
     <div class="account-grid">
       <section class="panel account-card" aria-labelledby="account-profile-title">
         <h3 id="account-profile-title">Profile</h3>
@@ -16,7 +16,7 @@ export function accountScreen(email: string, recovery = false) {
         <form id="account-profile-form">
           <label>Display name<input id="account-name" maxlength="80" autocomplete="nickname" placeholder="How should we call you?"></label>
           <label>Email<input type="email" value="${escapeHtml(email)}" readonly autocomplete="email"></label>
-          <p class="muted account-note">This is the email you use to sign in to CORE.</p>
+          <p class="muted account-note">This is the email you use to sign in to core.</p>
           <button class="primary" type="submit">Save profile</button>
           <p id="account-profile-status" role="status" aria-live="polite"></p>
         </form>
@@ -40,7 +40,7 @@ export function accountScreen(email: string, recovery = false) {
       </section>
       <section class="panel account-card account-session" aria-labelledby="account-session-title">
         <h3 id="account-session-title">Session</h3>
-        <p class="muted">Sign out of CORE and turn off push notifications on this device.</p>
+        <p class="muted">Sign out of core and turn off push notifications on this device.</p>
         <button class="ghost" id="account-sign-out" type="button">Sign out</button>
         <p id="account-signout-status" role="status" aria-live="polite"></p>
       </section>

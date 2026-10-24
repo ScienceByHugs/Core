@@ -11,12 +11,12 @@ export function dashboardPageMarkup(email: string, escapeHtml: Helpers['escapeHt
     '<section class="core-hero">' +
       '<div class="core-hero-copy">' +
         '<span class="core-hero-kicker">SCIENCE BY HUGS</span>' +
-        '<h1>CORE</h1>' +
+        '<h1>core.</h1>' +
         '<p>OPERATIONS <i>•</i> FINANCE <i>•</i> FULFILLMENT</p>' +
         '<small>Signed in as <strong>' + escapeHtml(email) + '</strong></small>' +
       '</div>' +
       '<div class="core-hero-orbit" aria-hidden="true"><span></span><i></i></div>' +
-      '<div class="core-live-card"><span><i></i> SYSTEM ONLINE</span><strong>CORE v1</strong><small>Live</small></div>' +
+      '<div class="core-live-card"><span><i></i> SYSTEM ONLINE</span><strong>core 2.0</strong><small>Live</small></div>' +
     '</section>' +
     '<section id="executive-dashboard"><div class="loading">Loading command center…</div></section>' +
   '</section>'

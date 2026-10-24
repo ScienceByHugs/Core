@@ -7,7 +7,7 @@ import './brand.css'
 
 const stagingLabel = document.createElement('div')
 stagingLabel.id = 'staging-environment-label'
-stagingLabel.textContent = 'CORE 2.0 · INTERNAL STAGING · TEST ACCOUNTS ONLY'
+stagingLabel.textContent = 'core 2.0 · INTERNAL STAGING · TEST ACCOUNTS ONLY'
 stagingLabel.setAttribute('role', 'status')
 document.body.prepend(stagingLabel)
 import { supabase } from './services/supabase'
@@ -193,9 +193,9 @@ function shell(content: string, signedIn = false) {
     <a class="skip-link" href="#core-content">Skip to content</a>
     ${pushPrompt()}
     <div class="core-app-shell">
-      <aside class="core-sidebar" id="core-sidebar" aria-label="CORE workspace navigation">
+      <aside class="core-sidebar" id="core-sidebar" aria-label="core workspace navigation">
         <div class="core-sidebar-brand">
-          <img class="core-brand-lockup" src="${coreLogoUrl}" alt="Core — Science By Hugs" />
+          <img class="core-brand-lockup" src="${coreLogoUrl}" alt="core. by Science By Hugs" />
           <button class="core-nav-close" id="core-nav-close" type="button" aria-label="Close navigation">×</button>
         </div>
         ${navigation}
@@ -224,7 +224,7 @@ function shell(content: string, signedIn = false) {
           <button class="core-menu-button" id="core-nav-toggle" type="button" aria-controls="core-sidebar" aria-expanded="false">
             <span aria-hidden="true">☰</span><b>Menu</b>
           </button>
-          <img class="core-mobile-logo" src="${coreLogoUrl}" alt="Core — Science By Hugs" />
+          <img class="core-mobile-logo" src="${coreLogoUrl}" alt="core. by Science By Hugs" />
           <a href="#account" class="core-mobile-alert core-account-shortcut" aria-label="Open account" title="Account">${avatarMarkup()}</a>
         </header>
 
@@ -310,9 +310,9 @@ function renderLogin(message = '') {
   shell(`
     <section class="login-wrap">
       <div class="login-card">
-        <img class="core-login-lockup" src="${coreLogoUrl}" alt="Core — Science By Hugs" />
+        <img class="core-login-lockup" src="${coreLogoUrl}" alt="core. by Science By Hugs" />
         <span class="eyebrow">ADMINISTRATOR ACCESS</span>
-        <h1 class="login-title">Sign in to CORE</h1>
+        <h1 class="login-title">Sign in to core</h1>
         <p class="copy">Sign in with an authorized Science By Hugs administrator account.</p>
         <form id="login-form" class="login-form">
           <label>Email<input name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>

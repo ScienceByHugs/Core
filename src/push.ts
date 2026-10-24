@@ -86,7 +86,7 @@ export function pushPanel() {
   if (Capacitor.isNativePlatform()) return `<section class="push-panel" aria-label="Push notifications"><strong>Push notifications</strong><p data-push-status role="status">${nativePushUnavailable}</p><button data-push-toggle type="button" hidden disabled>Enable notifications</button><button data-push-test type="button" hidden disabled>Send test notification</button></section>`
   return `<section class="push-panel" aria-label="Push notifications">
     <strong>Push notifications</strong>
-    <p>Get new-order and payment updates even when CORE is closed. On iPhone/iPad, open the app from your Home Screen first.</p>
+    <p>Get new-order and payment updates even when core is closed. On iPhone/iPad, open the app from your Home Screen first.</p>
     <p data-push-status role="status" aria-live="polite">Checking this device…</p>
     <div class="push-actions"><button type="button" data-push-toggle disabled>Enable notifications</button>
     <button type="button" data-push-test hidden>Send test notification</button></div>
