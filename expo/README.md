@@ -1,0 +1,39 @@
+# core. (Expo)
+
+The native core. app, rebuilt screen by screen on the same stack as Pulse. The Capacitor app in the repo root keeps working until this one reaches parity.
+
+## One stack for pulse., nexus. and core.
+
+| Layer | Choice (same in all three apps) |
+| --- | --- |
+| Framework | Expo SDK 58, React Native, Expo Router |
+| Language | TypeScript, strict |
+| Backend | Supabase (Auth, Postgres, Edge Functions) via `@supabase/supabase-js` 2.117.1 |
+| Sessions | iOS keychain through `expo-secure-store`, chunked (shared adapter from Pulse) |
+| Design | Science By Hugs Design System tokens in `src/theme.ts` (this app: core. Sage) |
+| Builds | `eas build --platform ios --profile testflight --local` on a Mac or a GitHub-hosted Mac; no Expo cloud builds |
+| Release | TestFlight upload with Apple's `altool`, triggered manually and approved by Anthony |
+
+## What's here (first slice)
+
+- Sign-in with a confirmed owner or admin account; anyone else is signed out.
+- Home: what needs attention, last 7 days, recent orders (`core-dashboard`).
+- Inventory: search, Low / Out / Not counted filters, on hand / reserved / available (`core-catalog`).
+- Account: email, role, environment, sign out.
+
+Not yet rebuilt: orders, customers, payments, catalog editing, finance, analytics, referrals, notifications, admin tools and audit.
+
+## Run it on your iPhone
+
+```sh
+cd expo
+cp .env.example .env.local   # staging values only; production is refused
+npm install --legacy-peer-deps
+npx expo run:ios --device    # or: eas build --platform ios --profile testflight --local
+```
+
+Before the first EAS build, link the project once with `eas init` (it adds the project ID to `app.json`). Commit the `package-lock.json` the first install creates.
+
+## Staging rules
+
+Same as the web app: the build refuses production Supabase projects, production keys and non-HTTPS backends, and every staging Edge Function also requires a confirmed synthetic staging account. The bundle id `com.sciencebyhugs.core.expo.staging` keeps this app separate from the Capacitor staging app on the same phone.
