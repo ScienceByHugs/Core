@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { Linking, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Notice, Screen, SectionTitle } from '@/components/ui';
 import { loadOrders, saveDeliveryEstimate } from '@/services/orders';
+import { recordEditsEnabled, recordEditsOffMessage } from '@/services/write-gate';
 import { customerName, invoiceUrl, matchesOrder, orderMoney, statusLabel, validDeliveryDate, type CoreOrder } from '@/services/order-model';
 import { colors, radius, space, touchTarget, type } from '@/theme';
 
@@ -128,10 +129,11 @@ function OrderDetail({ order, close, saved }: { order: CoreOrder; close: () => v
       {order.payment_method === 'sandbox' ? <Notice tone="warning">Sandbox reservation. No payment was collected and no fulfillment will be dispatched. Cancel pending sandbox orders in nexus to release reserved stock.</Notice> : <View style={styles.editor}>
         <Text style={styles.caption}>Estimated date · YYYY-MM-DD</Text>
         <TextInput accessibilityLabel="Estimated delivery date, YYYY-MM-DD" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD"
-          placeholderTextColor={colors.textMuted} editable={!saving} autoCapitalize="none" autoCorrect={false} maxLength={10} style={styles.input} />
+          placeholderTextColor={colors.textMuted} editable={!saving && recordEditsEnabled} autoCapitalize="none" autoCorrect={false} maxLength={10} style={styles.input} />
         <Notice>Saving or clearing changes the date shown in the customer’s nexus account.</Notice>
-        <Button label={saving ? 'Saving…' : 'Save date'} disabled={saving} onPress={() => void save(false)} />
-        <Button label="Clear date" disabled={saving || !order.estimated_delivery_date} variant="secondary" onPress={() => void save(true)} />
+        {!recordEditsEnabled ? <Notice tone="warning">{recordEditsOffMessage}</Notice> : null}
+        <Button label={saving ? 'Saving…' : 'Save date'} disabled={saving || !recordEditsEnabled} onPress={() => void save(false)} />
+        <Button label="Clear date" disabled={saving || !recordEditsEnabled || !order.estimated_delivery_date} variant="secondary" onPress={() => void save(true)} />
       </View>}
     </View>
     {message ? <Notice tone={failed ? 'error' : 'muted'}>{message}</Notice> : null}

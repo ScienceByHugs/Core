@@ -1,4 +1,5 @@
 import { invokeCore } from './invoke';
+import { assertRecordEdits } from './write-gate';
 import { validDeliveryDate, type CoreOrder } from './order-model';
 export async function loadOrders(): Promise<CoreOrder[]> {
   const data = await invokeCore<{ success: boolean; orders: CoreOrder[] }>('core-orders');
@@ -6,9 +7,12 @@ export async function loadOrders(): Promise<CoreOrder[]> {
   return data.orders;
 }
 export async function saveDeliveryEstimate(orderId: string, date: string | null) {
+  assertRecordEdits();
   if (date !== null && !validDeliveryDate(date)) throw new Error('Enter a valid date as YYYY-MM-DD.');
   const data = await invokeCore<{ success: boolean; order: Pick<CoreOrder, 'id' | 'estimated_delivery_date' | 'updated_at'> }>(
     'core-orders', { action: 'set_delivery_estimate', orderId, estimatedDeliveryDate: date },
+    // Never retry writes automatically, matching every other core. write.
+    { retry: false },
   );
   if (data.success !== true || data.order?.id !== orderId) throw new Error('Could not confirm the saved estimate. Refresh orders before retrying.');
   return data.order;

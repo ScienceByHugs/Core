@@ -36,7 +36,16 @@ test('invoice links reject executable/local schemes and embedded credentials', (
   assert.equal(model.invoiceUrl('https://example.test/invoice.pdf?token=abc'), 'https://example.test/invoice.pdf?token=abc');
   for (const url of [null, '', 'javascript:alert(1)', 'file:///invoice.pdf', 'http://example.test/a', 'https://user:password@example.test/a', 'not a url']) assert.equal(model.invoiceUrl(url), null);
 });
-function service(invokeCore) { return load('orders.ts', { './invoke': { invokeCore }, './order-model': model }); }
+
+const writeGateOn = { assertRecordEdits: () => {}, recordEditsEnabled: true };
+function writeGate(value) {
+  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../expo/src/services/write-gate.ts'), 'utf8'),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const context = { exports: {}, Error, process: { env: value === undefined ? {} : { EXPO_PUBLIC_ENABLE_ADMIN_WRITES: value } } };
+  vm.runInNewContext(code, context);
+  return context.exports;
+}
+function service(invokeCore, gate = writeGateOn) { return load('orders.ts', { './invoke': { invokeCore }, './order-model': model, './write-gate': gate }); }
 test('order read uses the existing endpoint and rejects malformed success responses', async () => {
   const calls = [];
   const api = service(async (...args) => { calls.push(args); return { success: true, orders: [order] }; });
@@ -48,12 +57,12 @@ test('order read uses the existing endpoint and rejects malformed success respon
 });
 test('delivery estimate uses explicit save/clear payload and only accepts matching server confirmation', async () => {
   const calls = [];
-  const api = service(async (name, body) => { calls.push([name, body]); return { success: true, order: { id: body.orderId, estimated_delivery_date: body.estimatedDeliveryDate, updated_at: 'server-time' } }; });
+  const api = service(async (name, body, options) => { calls.push([name, body, options]); return { success: true, order: { id: body.orderId, estimated_delivery_date: body.estimatedDeliveryDate, updated_at: 'server-time' } }; });
   assert.equal((await api.saveDeliveryEstimate(order.id, '2026-10-30')).estimated_delivery_date, '2026-10-30');
   assert.equal((await api.saveDeliveryEstimate(order.id, null)).estimated_delivery_date, null);
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
-    ['core-orders', { action: 'set_delivery_estimate', orderId: order.id, estimatedDeliveryDate: '2026-10-30' }],
-    ['core-orders', { action: 'set_delivery_estimate', orderId: order.id, estimatedDeliveryDate: null }],
+    ['core-orders', { action: 'set_delivery_estimate', orderId: order.id, estimatedDeliveryDate: '2026-10-30' }, { retry: false }],
+    ['core-orders', { action: 'set_delivery_estimate', orderId: order.id, estimatedDeliveryDate: null }, { retry: false }],
   ]);
   await assert.rejects(api.saveDeliveryEstimate(order.id, '2026-02-30'), /valid date/);
   assert.equal(calls.length, 2);
@@ -63,4 +72,17 @@ test('permission and server failures propagate rather than becoming empty orders
   const api = service(async () => { throw new Error('core. administrator access is required.'); });
   await assert.rejects(api.loadOrders(), /administrator/);
   await assert.rejects(api.saveDeliveryEstimate(order.id, null), /administrator/);
+});
+
+test('record-edit switch is off unless exactly "true" and blocks delivery estimates before any request', async () => {
+  for (const value of [undefined, '', 'false', 'TRUE', '1', 'yes']) assert.equal(writeGate(value).recordEditsEnabled, false);
+  assert.equal(writeGate('true').recordEditsEnabled, true);
+  let calls = 0;
+  const off = service(async () => { calls++; return { success: true, order: { id: order.id } }; }, writeGate(undefined));
+  await assert.rejects(off.saveDeliveryEstimate(order.id, '2026-10-30'), /Editing is off/);
+  await assert.rejects(off.saveDeliveryEstimate(order.id, null), /Editing is off/);
+  assert.equal(calls, 0);
+  const on = service(async (name, body) => { calls++; return { success: true, order: { id: body.orderId, estimated_delivery_date: null, updated_at: 'now' } }; }, writeGate('true'));
+  await on.saveDeliveryEstimate(order.id, null);
+  assert.equal(calls, 1);
 });

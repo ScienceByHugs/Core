@@ -26,7 +26,7 @@ The native core. app, rebuilt screen by screen on the same stack as Pulse. The C
 - Finance (from Home): operational summary, invoice aging, payment review/method mix, outstanding customer order values and monthly paid revenue via the existing core-finance contract. Read-only.
 - Account: email, role, environment, sign out.
 
-Not yet rebuilt: analytics, referrals, notifications, admin tools and audit.
+All planned core screen drafts are now present. Physical-device and live staging acceptance remain pending.
 
 ## Run it on your iPhone
 
@@ -46,3 +46,11 @@ Same as the web app: the build refuses production Supabase projects, production 
 ## Test payment gate
 
 EXPO_PUBLIC_ENABLE_TEST_PAYMENTS defaults to false. Enable it only for an approved synthetic staging build after core-payment-control is reviewed and verified to use staging/sandbox targets. This client flag is not server authorization: owner/admin and staging/payment isolation must be enforced by the backend. No payment function is deployed by this app. The native view reads the latest 100 invoices.
+
+## Remaining workspace screens
+
+Home opens Analytics (7/30/90/all-time KPIs; latest-90-day trend, rankings and mixes), Referrals (progress, milestones, records and rewards), Notifications (signals and test-message composer), Admin tools (templates, discount codes, invitations/activation and customer membership/status/email controls), and Audit (search/filter and before/after details). Five tabs are retained.
+
+All reads use existing guarded service contracts. Every record edit defaults OFF via EXPO_PUBLIC_ENABLE_ADMIN_WRITES: delivery estimates (Orders), profile, notes and contact edits (Customers), product, stock, publication and category changes (Catalog), and Admin tools. While it is off, those screens show a notice and their save controls are disabled; the services also refuse the request before it is sent. Outbound test messages/authentication email additionally require EXPO_PUBLIC_ENABLE_TEST_MESSAGES and synthetic addresses in EXPO_PUBLIC_TEST_RECIPIENT_EMAILS. Activation redirects allow only the exact documented nexus staging origin. These client gates do not replace server-side synthetic tester authorization, recipient allowlists, redirect configuration, suppression, rate limits or audit/idempotency controls. Do not enable them until actual staging endpoints and outbound targets are reviewed. Writes are not automatically retried; confirmation and post-action review are required. No message or administrative write was run during screen development.
+
+Native device push registration/APNs, permission/tap handling and verified delivery are separate pending device/backend integration work. The Notifications screen's operational queue and composer are implemented; no native token registration is claimed. The legacy web production activation URL is not copied into the native helper.
