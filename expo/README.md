@@ -20,9 +20,10 @@ The native core. app, rebuilt screen by screen on the same stack as Pulse. The C
 - Home: what needs attention, last 7 days, recent orders (`core-dashboard`).
 - Inventory: search, Low / Out / Not counted filters, on hand / reserved / available (`core-catalog`).
 - Orders: latest 100, search/status filters, order detail, exact historical totals, invoice PDF access and delivery estimate editing (`core-orders`). Sandbox reservations have no delivery controls.
+- Customers: search/membership filters, profile/history/referrals/rewards, profile/notes/contact editing through existing guarded endpoints. Membership/status/login-email changes remain in the current app.
 - Account: email, role, environment, sign out.
 
-Not yet rebuilt: customers, payments, catalog editing, finance, analytics, referrals, notifications, admin tools and audit.
+Not yet rebuilt: payments, catalog editing, finance, analytics, referrals, notifications, admin tools and audit.
 
 ## Run it on your iPhone
 
