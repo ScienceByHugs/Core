@@ -1,0 +1,37 @@
+name: Backend schema CI
+# Builds the nexus./core. database from git (baseline + newer migrations) on a
+# throwaway Postgres 17 and runs the SQL tests. No Supabase project or secrets.
+on:
+  push:
+    branches: [staging]
+    paths: ['supabase/**', '.github/workflows/backend-ci.yml']
+  pull_request:
+    paths: ['supabase/**', '.github/workflows/backend-ci.yml']
+permissions:
+  contents: read
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Build from git and run SQL tests
+        run: bash supabase/baseline/test/verify.sh
