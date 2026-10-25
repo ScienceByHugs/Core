@@ -1,9 +1,10 @@
 name: V2 staging foundation CI
 on:
+  # `staging` is the 2.0 integration branch (formerly codex/v2-development).
   push:
-    branches: ['codex/v2-**']
+    branches: [staging]
+  # Every pull request, including stacked PRs whose base is another work branch.
   pull_request:
-    branches: [main, 'codex/v2-**']
 permissions:
   contents: read
 concurrency:
@@ -40,3 +41,35 @@ jobs:
         run: npm run build
       - name: Verify staging artifact and workflow boundaries
         run: npm run verify:staging
+
+  expo:
+    name: Expo app (type check and iOS bundle)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      # Compile-only values; the bundle is never run against a backend here.
+      EXPO_PUBLIC_APP_ENV: staging
+      EXPO_PUBLIC_SUPABASE_URL: https://cicompileonlyxxxxxxx.supabase.co
+      EXPO_PUBLIC_EXPECTED_SUPABASE_REF: cicompileonlyxxxxxxx
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_build_only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Same flags as Pulse: React Native's release candidate is outside some peer ranges.
+      - name: Install locked dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Type check
+        shell: bash
+        run: |
+          set -o pipefail
+          # Report each error with its file and line so it shows on the PR.
+          npx --no-install tsc --noEmit --pretty false \
+            | sed -E 's#^([^(]+)\(([0-9]+),([0-9]+)\): error (TS[0-9]+): (.*)$#::error file=expo/\1,line=\2,col=\3::\4 \5#'
+      - name: Compile the iOS bundle (no native build, no upload)
+        run: npx --no-install expo export --platform ios --output-dir dist-check

@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "core staging",
+    "slug": "core",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "scheme": "core-staging",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/core-icon.png",
+    "backgroundColor": "#0F1412",
+    "splash": {
+      "image": "./assets/core-splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F1412"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sciencebyhugs.core.staging",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ]
+  }
+}
