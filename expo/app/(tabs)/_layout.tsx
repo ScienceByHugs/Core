@@ -7,11 +7,12 @@ import { colors } from '@/theme';
 // Same icon approach as Pulse: SF Symbols on iOS, vector drawables on Android.
 const tabIcons = {
   index: Icon.select({ ios: 'house.fill', android: require('../../assets/icons/home.xml') }),
+  orders: Icon.select({ ios: 'list.bullet.rectangle', android: require('../../assets/icons/orders.xml') }),
   inventory: Icon.select({ ios: 'shippingbox.fill', android: require('../../assets/icons/inventory.xml') }),
   account: Icon.select({ ios: 'person.fill', android: require('../../assets/icons/account.xml') }),
 } as const;
 
-const labels: Record<string, string> = { index: 'Home', inventory: 'Inventory', account: 'Account' };
+const labels: Record<string, string> = { index: 'Home', orders: 'Orders', inventory: 'Inventory', account: 'Account' };
 
 function TabIcon({ routeName, color }: { routeName: string; color: ColorValue }) {
   const name = tabIcons[routeName as keyof typeof tabIcons] ?? tabIcons.index;
@@ -38,6 +39,7 @@ export default function TabsLayout() {
       })}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="orders" options={{ title: 'Orders' }} />
       <Tabs.Screen name="inventory" options={{ title: 'Inventory' }} />
       <Tabs.Screen name="account" options={{ title: 'Account' }} />
     </Tabs>
