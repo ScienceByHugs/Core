@@ -9,7 +9,6 @@ The same rules apply in every Science By Hugs repository: Core, Nexus, Pulse and
 | `main` | What is live: core.sciencebyhugs.com (core 1.0) and the App Store app | Pull request only, merged by Anthony |
 | `staging` | What's on TestFlight and the staging site (2.0 work) | Pull request only, merged by Anthony |
 | `feat/…`, `fix/…`, `design/…`, `ci/…`, `docs/…` | One piece of work | Anyone; deleted automatically after merge |
-| `archive/2026-10-25` | Old branches kept for reference (see `ARCHIVE.md` on that branch) | Never merged |
 
 - Nobody pushes straight to `main` or `staging`. Changes go through a pull request with CI passing.
 - Work branches start from `staging` and target it.
@@ -45,7 +44,9 @@ Never tag a commit you can't prove the build came from.
 - Merging, deploying, signed builds, TestFlight or App Store uploads, and production changes: **Anthony only, each time, for that specific action**.
 - Staging work never touches production backends.
 
-## Restoring an archived branch
+## Restoring an old branch
+
+Core's old `codex/` branches were fully merged into `staging`, so nothing was archived here. Other repositories keep old branches on `archive/2026-10-25`; restore one the same way:
 
 ```sh
 git fetch origin archive/2026-10-25
