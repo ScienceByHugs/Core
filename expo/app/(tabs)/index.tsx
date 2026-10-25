@@ -1,6 +1,7 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Card, Notice, Row, Screen, SectionTitle, Wordmark, money } from '@/components/ui';
+import { Button, Card, Notice, Row, Screen, SectionTitle, Wordmark, money } from '@/components/ui';
 import { loadDashboard, type CoreDashboard } from '@/services/dashboard';
 import { colors, space, type } from '@/theme';
 
@@ -18,6 +19,7 @@ const statusLabel = (order: CoreDashboard['operations']['recent_orders'][number]
 };
 
 export default function Home() {
+  const router = useRouter();
   const [data, setData] = useState<CoreDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,6 +55,7 @@ export default function Home() {
   return (
     <Screen refreshing={refreshing} onRefresh={load}>
       <Wordmark />
+      <Button label="Payments" variant="secondary" onPress={() => router.push('/payments')} />
       <View style={{ gap: space[1] }}>
         <Text style={styles.date}>
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
