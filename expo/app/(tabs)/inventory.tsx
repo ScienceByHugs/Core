@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Card, Notice, Row, Screen } from '@/components/ui';
+import { Button, Card, Notice, Row, Screen } from '@/components/ui';
 import { loadInventory, stockState, type InventoryProduct, type StockState } from '@/services/inventory';
 import { colors, radius, space, touchTarget, type } from '@/theme';
 
@@ -14,6 +15,8 @@ const tag: Record<StockState, { text: string; color: string }> = {
 };
 
 export default function InventoryScreen() {
+  const router = useRouter();
+  const request = useRef(0);
   const [products, setProducts] = useState<InventoryProduct[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -21,18 +24,19 @@ export default function InventoryScreen() {
   const [filter, setFilter] = useState<Filter>('all');
 
   const load = useCallback(async () => {
+    const id = ++request.current;
     setRefreshing(true);
     try {
-      setProducts(await loadInventory());
-      setError(null);
+      const data = await loadInventory();
+      if (id === request.current) { setProducts(data); setError(null); }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load inventory.');
+      if (id === request.current) setError(e instanceof Error ? e.message : 'Could not load inventory.');
     } finally {
-      setRefreshing(false);
+      if (id === request.current) setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useFocusEffect(useCallback(() => { void load(); return () => { request.current++; }; }, [load]));
 
   const all = products ?? [];
   const counts = useMemo(() => {
@@ -69,6 +73,7 @@ export default function InventoryScreen() {
   return (
     <Screen refreshing={refreshing} onRefresh={load}>
       <Text accessibilityRole="header" style={styles.title}>Inventory</Text>
+      <Button label="Manage catalog" variant="secondary" onPress={() => router.push('/catalog')} />
 
       <TextInput
         accessibilityLabel="Search inventory"
