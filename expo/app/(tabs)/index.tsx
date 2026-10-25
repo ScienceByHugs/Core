@@ -178,6 +178,7 @@ export default function Home() {
         <View style={styles.grid}>
           {(
             [
+              ["/research", "Research access"],
               ["/payments", "Payments"],
               ["/finance", "Finance"],
               ["/analytics", "Analytics"],

@@ -26,6 +26,7 @@ function Routes() {
         <Stack.Screen name="notifications" />
         <Stack.Screen name="admin-tools" />
         <Stack.Screen name="audit" />
+        <Stack.Screen name="research" />
       </Stack.Protected>
     </Stack>
   );
