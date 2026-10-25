@@ -41,7 +41,7 @@ Before the first EAS build, link the project once with `eas init` (it adds the p
 
 ## Staging rules
 
-Same as the web app: the build refuses production Supabase projects, production keys and non-HTTPS backends, and every staging Edge Function also requires a confirmed synthetic staging account. The bundle id `com.sciencebyhugs.core.expo.staging` keeps this app separate from the Capacitor staging app on the same phone.
+Same as the web app: the build refuses production Supabase projects, production keys and non-HTTPS backends, and every staging Edge Function also requires a confirmed synthetic staging account. This is the staging app: bundle id `com.sciencebyhugs.core.staging`, named "core staging", built from `staging`. It installs beside the production app (`com.sciencebyhugs.core`), which is built from `main`.
 
 ## Test payment gate
 
