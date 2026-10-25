@@ -13,6 +13,7 @@ function Routes() {
       <Stack.Protected guard={Boolean(session)} redirectTo="/sign-in">
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="payments" />
+        <Stack.Screen name="catalog" />
       </Stack.Protected>
     </Stack>
   );
