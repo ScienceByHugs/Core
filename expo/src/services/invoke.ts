@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 // Calls a core-* Edge Function and turns its failures into short, actionable
 // messages. Retries only transient server and network errors.
-export async function invokeCore<T>(name: string, body: Record<string, unknown> = {}): Promise<T> {
+export async function invokeCore<T>(name: string, body: Record<string, unknown> = {}, options: { retry?: boolean } = {}): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     const { data, error } = await supabase.functions.invoke(name, { body, timeout: 15000 });
     if (!error && data?.success !== false) return data as T;
@@ -25,7 +25,7 @@ export async function invokeCore<T>(name: string, body: Record<string, unknown> 
         if (retryable) message = 'Could not reach the server. Check your connection.';
       }
     }
-    if (!retryable || attempt >= 2) throw new Error(message);
+    if (options.retry === false || !retryable || attempt >= 2) throw new Error(message);
     await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 750 : 1500));
   }
 }
