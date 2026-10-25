@@ -1,11 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.117.1';
-import { runtimeKeys, STAGING_REF } from '../_shared/staging.ts';
+import { isStagingProject, runtimeKeys } from '../_shared/staging.ts';
 const origins = new Set(['http://localhost:5173','http://localhost:5174','capacitor://localhost','https://sbh-core-v2-staging.pages.dev','https://sbh-nexus-v2-staging.pages.dev']);
 Deno.serve(async req => {
  const origin=req.headers.get('origin');
  const headers={'Content-Type':'application/json','Access-Control-Allow-Origin':origin && origins.has(origin)?origin:'http://localhost:5174','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type, x-supabase-api-version','Access-Control-Allow-Methods':'POST, OPTIONS','Vary':'Origin'};
  const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers});
- if(Deno.env.get('SUPABASE_URL')!==`https://${STAGING_REF}.supabase.co`)return json({error:'Staging project mismatch'},503);
+ if(!isStagingProject())return json({error:'Staging project mismatch'},503);
  if(origin&&!origins.has(origin))return json({error:'Origin not approved for staging'},403);
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers});
  if(req.method!=='POST')return json({error:'POST required'},405);
