@@ -1,4 +1,5 @@
 import { invokeCore } from './invoke';
+import { assertRecordEdits } from './write-gate';
 import { validateProfile, type CoreCustomer, type CoreCustomersWorkspace, type CustomerProfileDraft } from './customer-model';
 type ProfileFields = 'first_name' | 'last_name' | 'phone' | 'address_line_1' | 'address_line_2' | 'city' | 'state' | 'postal_code';
 export type CustomerPatch = Pick<CoreCustomer, 'id' | 'updated_at'> & Partial<Pick<CoreCustomer, ProfileFields | 'notes' | 'preferred_contact_method'>>;
@@ -8,6 +9,7 @@ export async function loadCustomers(): Promise<CoreCustomersWorkspace> {
   return { customers: data.customers, memberships: data.memberships };
 }
 async function mutate(customerId: string, action: string, fields: Record<string, unknown>, required: string[]) {
+  assertRecordEdits();
   // Mutations are not automatically retried: the server also records audit events.
   const data = await invokeCore<{ success: boolean; customer: CustomerPatch }>(
     'core-customer-control', { action, customerId, ...fields }, { retry: false },

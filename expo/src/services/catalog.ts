@@ -1,4 +1,5 @@
 import { invokeCore } from './invoke';
+import { assertRecordEdits } from './write-gate';
 import { categoryPayload, productPayload, publicationPayload, stockPayload, type CoreCatalogCategory, type ManagedProduct, type ProductDraft, type PublicationState, type Verification } from './catalog-model';
 export type CatalogWorkspace = { products: ManagedProduct[]; categories: CoreCatalogCategory[] };
 export type CatalogEvent = { id: string; action?: string; created_at: string; before_data?: unknown; after_data?: unknown; metadata?: unknown };
@@ -8,6 +9,7 @@ export async function loadCatalog(): Promise<CatalogWorkspace> {
   return { products: data.products, categories: data.categories };
 }
 async function command(body: Record<string, unknown>) {
+  assertRecordEdits();
   const data = await invokeCore<{ success: boolean; product?: ManagedProduct; category?: CoreCatalogCategory }>('core-catalog-control', body, { retry: false });
   if (data.success !== true) throw new Error('Could not confirm the change. Refresh before retrying.');
   return data;

@@ -12,7 +12,16 @@ function load(file, imports = {}, extra = {}) {
 }
 const model = load('customer-model.ts');
 const customer = { id: 'c-1', first_name: 'Ada', last_name: 'Lovelace', customer_number: 'C-22', email: 'ada@example.test', phone: '555-0100', referral_code: 'ADA5', membership: { slug: 'principal', name: 'Principal Scientist' } };
-function service(invokeCore) { return load('customers.ts', { './invoke': { invokeCore }, './customer-model': model }); }
+
+const writeGateOn = { assertRecordEdits: () => {}, recordEditsEnabled: true };
+function writeGate(value) {
+  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../expo/src/services/write-gate.ts'), 'utf8'),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const context = { exports: {}, Error, process: { env: value === undefined ? {} : { EXPO_PUBLIC_ENABLE_ADMIN_WRITES: value } } };
+  vm.runInNewContext(code, context);
+  return context.exports;
+}
+function service(invokeCore, gate = writeGateOn) { return load('customers.ts', { './invoke': { invokeCore }, './customer-model': model, './write-gate': gate }); }
 test('customer search combines membership with name, number, contact and referral search', () => {
   for (const query of [' ADA LOVELACE ', 'c-22', 'ada@example', '555-0100', 'ada5', 'scientist']) {
     assert.equal(model.matchesCustomer(customer, query, 'principal'), true, query);
@@ -70,4 +79,13 @@ test('function adapter makes one network attempt for audited writes while retain
   calls = 0;
   await assert.rejects(api.invokeCore('core-customers'), /reach the server/);
   assert.equal(calls, 3);
+});
+
+test('customer profile, notes and contact edits are blocked before any request while the switch is off', async () => {
+  let calls = 0;
+  const off = service(async () => { calls++; return { success: true, customer: { id: customer.id } }; }, writeGate('false'));
+  await assert.rejects(off.saveCustomerNotes(customer.id, 'note'), /Editing is off/);
+  await assert.rejects(off.saveContactPreference(customer.id, 'email'), /Editing is off/);
+  await assert.rejects(off.saveCustomerProfile(customer.id, model.profileDraft(customer)), /Editing is off/);
+  assert.equal(calls, 0);
 });

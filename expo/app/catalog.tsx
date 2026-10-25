@@ -5,6 +5,7 @@ import { Button, Card, Notice, Screen, SectionTitle } from '@/components/ui';
 import { adjustStock, loadCatalog, loadProductHistory, saveCategory, saveProduct, savePublication, type CatalogEvent, type CatalogWorkspace } from '@/services/catalog';
 import { matchesProduct, productDraft, productFields, type CoreCatalogCategory, type ManagedProduct, type PublicationState, type Verification } from '@/services/catalog-model';
 import { orderMoney } from '@/services/order-model';
+import { recordEditsEnabled, recordEditsOffMessage } from '@/services/write-gate';
 import { colors, radius, space, touchTarget, type } from '@/theme';
 
 type Editor = { mode: 'product' | 'stock' | 'publication' | 'history'; product?: ManagedProduct } | { mode: 'category'; category?: CoreCatalogCategory };
@@ -33,6 +34,7 @@ export default function CatalogScreen() {
       <Button label="Back to inventory" variant="secondary" onPress={() => router.replace('/(tabs)/inventory')} />
       <Text accessibilityRole="header" style={styles.title}>Catalog</Text>
       <Notice>Staging · drafts and unverified products stay unpublished. Package size is separate from stock.</Notice>
+      {!recordEditsEnabled ? <Notice tone="warning">{recordEditsOffMessage}</Notice> : null}
       <Button label="Create draft product" disabled={!workspace} onPress={() => setEditor({ mode: 'product' })} />
       <View style={styles.editor}><SectionTitle>Categories</SectionTitle>
         <Button label="New category" variant="secondary" disabled={!workspace} onPress={() => setEditor({ mode: 'category' })} />
@@ -107,7 +109,7 @@ function CatalogEditor({ editor, categories, close, refresh }: { editor: Editor;
       : editor.mode === 'stock' ? 'This records a physical count and adjustment reason in staging. Reserved stock remains protected by the server.' : 'This changes the staging category. Review effects on assigned products.',
     [{ text: 'Cancel', style: 'cancel' }, { text: 'Save', onPress: () => void run() }],
   );
-  const disabled = busy || saved;
+  const disabled = busy || saved || !recordEditsEnabled;
   return <Screen>
     <Button label="Close catalog editor" variant="secondary" onPress={close} />
     <Text accessibilityRole="header" style={styles.title}>{editor.mode === 'product' ? product ? 'Edit product' : 'Create draft' : editor.mode === 'stock' ? 'Adjust stock' : editor.mode === 'publication' ? 'Publication review' : editor.mode === 'category' ? 'Category' : 'Product history'}</Text>

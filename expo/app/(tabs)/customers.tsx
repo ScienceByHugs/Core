@@ -4,6 +4,7 @@ import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { Button, Card, Notice, Screen, SectionTitle } from '@/components/ui';
 import { customerDisplayName, matchesCustomer, profileDraft, profileFields, type CoreCustomer, type CoreCustomersWorkspace } from '@/services/customer-model';
 import { loadCustomers, saveContactPreference, saveCustomerNotes, saveCustomerProfile, type CustomerPatch } from '@/services/customers';
+import { recordEditsEnabled, recordEditsOffMessage } from '@/services/write-gate';
 import { orderMoney, statusLabel } from '@/services/order-model';
 import { colors, radius, space, touchTarget, type } from '@/theme';
 
@@ -100,30 +101,31 @@ function CustomerDetail({ customer, saved, close }: { customer: CoreCustomer; sa
       <Field label="Latest order" value={dateTime(customer.metrics.latest_order_at)} />
       <Field label="Referral code" value={customer.referral_code} />
     </Card>
-    <Notice>Membership, account suspension and login-email changes remain in the current core app.</Notice>
+    <Notice>Membership, account status and login-email changes are in Admin tools.</Notice>
+    {!recordEditsEnabled ? <Notice tone="warning">{recordEditsOffMessage}</Notice> : null}
     <View><SectionTitle>Profile</SectionTitle><View style={styles.editor}>
       {profileFields.map(([key, label, , limit]) => <View key={key} style={styles.field}>
         <Text style={styles.caption}>{label}</Text>
         <TextInput accessibilityLabel={label} value={draft[key]} onChangeText={value => setDraft(current => ({ ...current, [key]: value }))}
-          editable={!busy} maxLength={limit} keyboardType={key === 'phone' ? 'phone-pad' : 'default'} style={styles.input} />
+          editable={!busy && recordEditsEnabled} maxLength={limit} keyboardType={key === 'phone' ? 'phone-pad' : 'default'} style={styles.input} />
       </View>)}
-      <Button label="Save profile" disabled={busy} onPress={() => void save(() => saveCustomerProfile(customer.id, draft), 'profile')} />
+      <Button label="Save profile" disabled={busy || !recordEditsEnabled} onPress={() => void save(() => saveCustomerProfile(customer.id, draft), 'profile')} />
     </View></View>
     <View><SectionTitle>Preferred contact</SectionTitle><View style={styles.editor}>
       <View accessibilityRole="radiogroup" style={styles.filters}>
         {[['', 'Not set'], ['email', 'Email'], ['phone', 'Phone'], ['text', 'Text']].map(([value, label]) => <Pressable key={value}
-          accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ checked: method === value, disabled: busy }} disabled={busy}
+          accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ checked: method === value, disabled: busy || !recordEditsEnabled }} disabled={busy || !recordEditsEnabled}
           onPress={() => setMethod(value || '')} style={[styles.filter, method === value && styles.active]}>
           <Text style={[styles.caption, method === value && { color: colors.background }]}>{label}</Text>
         </Pressable>)}
       </View>
-      <Button label="Save contact preference" disabled={busy} variant="secondary" onPress={() => void save(() => saveContactPreference(customer.id, method || null), 'contact')} />
+      <Button label="Save contact preference" disabled={busy || !recordEditsEnabled} variant="secondary" onPress={() => void save(() => saveContactPreference(customer.id, method || null), 'contact')} />
     </View></View>
     <View><SectionTitle>Internal notes</SectionTitle><View style={styles.editor}>
-      <TextInput accessibilityLabel="Internal customer notes" value={notes} onChangeText={setNotes} multiline maxLength={2000} editable={!busy}
+      <TextInput accessibilityLabel="Internal customer notes" value={notes} onChangeText={setNotes} multiline maxLength={2000} editable={!busy && recordEditsEnabled}
         style={[styles.input, styles.notes]} textAlignVertical="top" />
       <Notice>{notes.length} / 2000 characters</Notice>
-      <Button label="Save notes" variant="secondary" disabled={busy} onPress={() => void save(() => saveCustomerNotes(customer.id, notes), 'notes')} />
+      <Button label="Save notes" variant="secondary" disabled={busy || !recordEditsEnabled} onPress={() => void save(() => saveCustomerNotes(customer.id, notes), 'notes')} />
     </View></View>
     {busy ? <Notice>Saving…</Notice> : null}
     {message ? <Notice tone={failed ? 'error' : 'muted'}>{message}</Notice> : null}
