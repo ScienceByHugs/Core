@@ -4,8 +4,9 @@ Status: Day 1 foundation verified. The separately connected NEXUS 2.0 Supabase p
 
 ## Branches and local previews
 
-- Integration branch: `codex/v2-development`, starting from the recorded production commit.
-- Day 1 feature branch: `codex/v2-staging-foundation`, reviewed into the integration branch only.
+- Integration branch: `staging` (renamed from `codex/v2-development` on Oct 25, 2026), starting from the recorded production commit.
+- Production code is tagged `core-v1.0.0` at `7e36f4a`; `main` must match production, not staging.
+- Day 1 feature branch: `codex/v2-staging-foundation`, reviewed into the integration branch only (merged).
 - Do not merge these staging-only changes into production `main`.
 - NEXUS local preview: `http://localhost:5173`.
 - CORE local preview: `http://localhost:5174`.
