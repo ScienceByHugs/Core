@@ -1,6 +1,14 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.117.1';
 
+// Staging projects these functions may run on. Never add a production ref.
+//   evyssawhlarqqhgyswhz  original shared staging project
+//   leejnbrceylhdphmnxxr  nexus-core-2.0 (Science By Hugs - Pulse organization)
+export const STAGING_REFS = new Set(['evyssawhlarqqhgyswhz', 'leejnbrceylhdphmnxxr']);
 export const STAGING_REF = 'evyssawhlarqqhgyswhz';
+export function isStagingProject(): boolean {
+  const ref = (Deno.env.get('SUPABASE_URL') ?? '').match(/^https:\/\/([a-z0-9]{20})\.supabase\.co$/)?.[1];
+  return !!ref && STAGING_REFS.has(ref);
+}
 const origins = new Set(['http://localhost:5173', 'http://localhost:5174', 'capacitor://localhost', 'https://sbh-nexus-v2-staging.pages.dev', 'https://sbh-core-v2-staging.pages.dev']);
 export function runtimeKeys(kind: 'publishable' | 'secret'): string {
   const configured = Deno.env.get(kind === 'publishable' ? 'SUPABASE_PUBLISHABLE_KEYS' : 'SUPABASE_SECRET_KEYS');
@@ -21,7 +29,7 @@ export function serveStaging(handler: (req: Request) => Promise<Response>) {
       'Vary': 'Origin',
     };
     const respond = (body: unknown, status: number) => new Response(JSON.stringify(body), { status, headers });
-    if (Deno.env.get('SUPABASE_URL') !== `https://${STAGING_REF}.supabase.co`) return respond({ error: 'Staging project mismatch' }, 503);
+    if (!isStagingProject()) return respond({ error: 'Staging project mismatch' }, 503);
     if (origin && !origins.has(origin)) return respond({ error: 'Origin not approved for staging' }, 403);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (req.method !== 'POST') return respond({ error: 'POST required' }, 405);

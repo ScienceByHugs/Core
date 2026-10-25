@@ -31,11 +31,16 @@ begin
  perform public.core_catalog_mutate(ctx.admin_id,jsonb_build_object('action','set_publication','productId',pid,'status','published','verification',jsonb_build_object('authenticity',true,'eligibility',true,'imagery',true,'evidence','ROLLBACK ONLY simulated verification, never committed or published.')));
  assert (select count(*) from public.core_audit_events where entity_id=pid::text)>=3;
  assert (select stock_on_hand from public.product_inventory where product_id=pid)=10;
+ -- Customer A is an approved researcher for this transaction only; customer B is not.
+ insert into public.research_applications(auth_user_id,status,institution_name,role_title,principal_investigator,institutional_email,research_summary,terms_version,reviewed_at,reviewed_by,expires_at)
+ select ctx.customer_a,'approved','Rollback Test Institute','Research associate','Dr. Rollback',u.email,'Rollback-only fixture application used to exercise the verified catalog flow.','test',now(),ctx.admin_id,now()+interval '1 day'
+ from auth.users u where u.id=ctx.customer_a;
 end $$;
 grant select,update on catalog_test_context to authenticated,anon;
 set local role anon;
 do $$ begin
- assert (select count(id) from public.products)=1,'Anon sees only transaction verified product, never synthetic';
+ assert (select count(id) from public.products)=0,'Anon sees no products without an approved research account';
+ assert (select count(*) from public.product_inventory)=0,'Anon sees no stock without an approved research account';
  begin perform verification_evidence from public.products; raise exception 'Verification evidence exposed'; exception when insufficient_privilege then null; end;
  begin update public.products set price=0; raise exception 'Unexpected product write'; exception when insufficient_privilege then null; end;
  begin update public.product_inventory set stock_on_hand=100; raise exception 'Unexpected inventory write'; exception when insufficient_privilege then null; end;
@@ -48,6 +53,7 @@ declare ctx record; result jsonb; repeated jsonb; key uuid:=gen_random_uuid(); b
 begin
  select * into ctx from catalog_test_context;
  begin perform public.core_catalog_mutate(ctx.customer_a,'{}'); raise exception 'Unexpected RPC access'; exception when insufficient_privilege then null; end;
+ assert (select count(id) from public.products)=1,'Approved researcher sees only the verified product, never synthetic';
  result:=public.staging_submit_order(jsonb_build_array(jsonb_build_object('product_id',ctx.product_id,'quantity',4,'unit_price',12.50)),key,'Henderson');
  assert (result->>'total')::numeric=50;
  assert result->>'sandbox'='true';
@@ -70,6 +76,9 @@ reset role;
 select set_config('request.jwt.claims',jsonb_build_object('sub',customer_b,'role','authenticated')::text,true) from catalog_test_context;
 set local role authenticated;
 do $$ declare failed boolean:=false; begin
+ assert (select count(id) from public.products)=0,'Unapproved customer sees no products';
+ begin perform public.staging_submit_order(jsonb_build_array(jsonb_build_object('product_id',(select product_id from catalog_test_context),'quantity',1,'unit_price',12.50)),gen_random_uuid(),'Henderson'); failed:=true; exception when insufficient_privilege then null; end;
+ assert not failed,'Unapproved customer must not be able to order';
  assert not exists(select 1 from public.orders where id=(select order_id from catalog_test_context)),'Cross-customer order leak';
  begin perform public.staging_cancel_order((select order_id from catalog_test_context)); exception when others then failed:=true; end;
  assert failed,'Cross-customer cancellation must fail';
