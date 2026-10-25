@@ -23,9 +23,10 @@ The native core. app, rebuilt screen by screen on the same stack as Pulse. The C
 - Customers: search/membership filters, profile/history/referrals/rewards, profile/notes/contact editing through existing guarded endpoints. Membership/status/login-email changes remain in the current app.
 - Payments (from Home): invoice search/status review and test submission/verification UI; writes default OFF until staging backend verification.
 - Catalog (from Inventory): draft product editing/creation, stock adjustments, publication review, categories and product history through existing staging controls. No vendor cost editing or sync.
+- Finance (from Home): operational summary, invoice aging, payment review/method mix, outstanding customer order values and monthly paid revenue via the existing core-finance contract. Read-only.
 - Account: email, role, environment, sign out.
 
-Not yet rebuilt: finance, analytics, referrals, notifications, admin tools and audit.
+Not yet rebuilt: analytics, referrals, notifications, admin tools and audit.
 
 ## Run it on your iPhone
 
