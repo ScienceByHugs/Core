@@ -28,11 +28,11 @@ Not yet rebuilt: orders, customers, payments, catalog editing, finance, analytic
 ```sh
 cd expo
 cp .env.example .env.local   # staging values only; production is refused
-npm install --legacy-peer-deps
+npm ci --legacy-peer-deps
 npx expo run:ios --device    # or: eas build --platform ios --profile testflight --local
 ```
 
-Before the first EAS build, link the project once with `eas init` (it adds the project ID to `app.json`). Commit the `package-lock.json` the first install creates.
+Before the first EAS build, link the project once with `eas init` (it adds the project ID to `app.json`). Dependencies are pinned in `package-lock.json`; use `npm ci --legacy-peer-deps` for a clean install.
 
 ## Staging rules
 
