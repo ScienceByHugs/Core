@@ -56,6 +56,7 @@ export default function Home() {
     <Screen refreshing={refreshing} onRefresh={load}>
       <Wordmark />
       <Button label="Payments" variant="secondary" onPress={() => router.push('/payments')} />
+      <Button label="Finance" variant="secondary" onPress={() => router.push('/finance')} />
       <View style={{ gap: space[1] }}>
         <Text style={styles.date}>
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}

@@ -14,6 +14,7 @@ function Routes() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="payments" />
         <Stack.Screen name="catalog" />
+        <Stack.Screen name="finance" />
       </Stack.Protected>
     </Stack>
   );
