@@ -61,8 +61,8 @@ jobs:
         with:
           node-version: 24
       # Same flags as Pulse: React Native's release candidate is outside some peer ranges.
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Install locked dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
       - name: Type check
         shell: bash
         run: |
