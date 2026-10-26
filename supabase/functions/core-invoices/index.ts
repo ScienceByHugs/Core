@@ -113,9 +113,100 @@ Deno.serve(async (req: Request) => {
   const orderById = new Map(orders.map(order => [String(order.id), order]));
   const paymentByOrder = new Map(payments.map(payment => [String(payment.order_id), payment]));
 
+  // Fulfillment must not depend on invoice/PDF synchronization succeeding.
+  // These are read-only operational entries, NOT invoice records in the database.
+  const { data: paidOrders, error: paidOrderError } = await admin
+    .from("orders")
+    .select("id,order_number,customer_id,status,payment_status,payment_method,paid_at,ordered_at,shipped_at,delivered_at,estimated_delivery_date,delayed_at,cancelled_at,completed_at,updated_at,created_at,subtotal,shipping_total,discount_total,tax_total,total,contact_method")
+    .eq("payment_status", "paid")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (paidOrderError) return json({ error: "Could not load paid orders for fulfillment" }, 500);
+
+  const paidOrderIds = (paidOrders || []).map(order => order.id);
+  let fulfillmentOnly: Array<Record<string, unknown>> = [];
+  if (paidOrderIds.length) {
+    // Check all matching invoice rows, not just the 100 most recent invoices
+    // fetched above, to prevent duplicate entries for older invoices.
+    const { data: paidOrderInvoices, error: paidInvoiceError } = await admin
+      .from("invoices")
+      .select("order_id")
+      .in("order_id", paidOrderIds);
+    if (paidInvoiceError) return json({ error: "Could not reconcile paid orders" }, 500);
+
+    const invoiced = new Set((paidOrderInvoices || []).map(row => row.order_id).filter(Boolean));
+    const missing = (paidOrders || []).filter(order => !invoiced.has(order.id));
+
+    if (missing.length) {
+      const missingIds = missing.map(order => order.id);
+      const customerIds = [...new Set(missing.map(order => order.customer_id).filter(Boolean))];
+      const [missingItems, missingPayments, missingProfiles] = await Promise.all([
+        admin.from("order_items")
+          .select("order_id,product_id,product_code,product_name,quantity,unit_price,line_total")
+          .in("order_id", missingIds).order("created_at", { ascending: true }),
+        admin.from("payments")
+          .select("id,order_id,provider,payment_reference,amount,status,notes,submitted_at,verified_at,paid_at,created_at,updated_at")
+          .in("order_id", missingIds),
+        customerIds.length
+          ? admin.from("profiles").select("id,first_name,last_name,email,phone").in("id", customerIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (missingItems.error || missingPayments.error || missingProfiles.error) {
+        return json({ error: "Could not load uninvoiced fulfillment details" }, 500);
+      }
+
+      const profilesById = new Map((missingProfiles.data || []).map(p => [String(p.id), p]));
+      const missingPaymentsById = new Map((missingPayments.data || []).map(p => [String(p.order_id), p]));
+      const missingItemsById = new Map<string, Array<Record<string, unknown>>>();
+      for (const item of missingItems.data || []) {
+        const id = String(item.order_id);
+        const list = missingItemsById.get(id) || [];
+        list.push(item);
+        missingItemsById.set(id, list);
+      }
+
+      fulfillmentOnly = missing.map(order => {
+        const profile = profilesById.get(String(order.customer_id)) || null;
+        return {
+          id: "fulfillment:" + order.id,
+          invoice_number: order.order_number || "INVOICE PENDING",
+          order_id: order.id,
+          customer_id: order.customer_id,
+          status: "direct_checkout",
+          subtotal: order.subtotal,
+          shipping_total: order.shipping_total,
+          discount_total: order.discount_total,
+          tax_total: order.tax_total,
+          total: order.total,
+          payment_method: order.payment_method,
+          google_sheet_name: null,
+          google_sheet_url: null,
+          pdf_status: "pending",
+          pdf_url: null,
+          pdf_created_at: null,
+          created_at: order.created_at,
+          contact_method: order.contact_method,
+          customer_name_snapshot: profile
+            ? [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Customer"
+            : "Customer",
+          customer_email_snapshot: profile?.email || null,
+          customer_phone_snapshot: profile?.phone || null,
+          send_status: "not_sent",
+          sent_at: null,
+          sent_to: null,
+          items: missingItemsById.get(String(order.id)) || [],
+          order,
+          payment: missingPaymentsById.get(String(order.id)) || null,
+        };
+      });
+    }
+  }
+
   return json({
     success: true,
-    invoices: (invoices || []).map(invoice => ({
+    invoices: [...fulfillmentOnly, ...(invoices || []).map(invoice => ({
       ...invoice,
       items: invoice.order_id
         ? itemsByOrder.get(String(invoice.order_id)) || []
@@ -126,6 +217,6 @@ Deno.serve(async (req: Request) => {
       payment: invoice.order_id
         ? paymentByOrder.get(String(invoice.order_id)) || null
         : null,
-    })),
+    }))],
   });
 });

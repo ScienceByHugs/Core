@@ -12,6 +12,7 @@ stagingLabel.setAttribute('role', 'status')
 document.body.prepend(stagingLabel)
 import { supabase } from './services/supabase'
 import { bindOrdersPage, ordersPageMarkup } from './orders-view'
+import { listCoreOrders, type CoreOrder } from './services/orders'
 import { bindCheckoutPendingPage, checkoutPendingPageMarkup } from './checkout-pending-view'
 import { bindCustomersPage, customersPageMarkup } from './customers-view'
 import { bindCatalogPage, catalogPageMarkup } from './catalog-view'
@@ -587,6 +588,9 @@ function invoiceCard(invoice: CoreInvoice) {
         </span>
       </div>
 
+      ${invoice.status === 'missing_invoice'
+        ? '<p class="payment-note" role="status"><strong>Invoice synchronization required.</strong> This payment is already recorded as paid. Fulfillment can proceed, but the invoice must be reconciled separately. Do not capture payment again.</p>'
+        : ''}
       <div class="items">${itemRows || '<p class="muted">No item detail available.</p>'}</div>
 
       <div class="totals">
@@ -623,6 +627,55 @@ function invoiceCard(invoice: CoreInvoice) {
       <p class="card-message" aria-live="polite"></p>
     </article>
   `
+}
+
+// Paid orders may exist before the branded invoice bridge has synchronized.
+// Keep them in Fulfillment so a document-generation failure never blocks operations.
+function missingInvoiceEntry(order: CoreOrder): CoreInvoice {
+  return {
+    id: 'missing-invoice:' + order.id,
+    invoice_number: 'INVOICE MISSING',
+    order_id: order.id,
+    customer_id: order.customer_id || '',
+    status: 'missing_invoice',
+    subtotal: order.subtotal,
+    shipping_total: order.shipping_total,
+    discount_total: order.discount_total,
+    tax_total: order.tax_total,
+    total: order.total,
+    payment_method: order.payment_method,
+    google_sheet_name: null,
+    google_sheet_url: null,
+    pdf_status: null,
+    pdf_url: null,
+    pdf_created_at: null,
+    created_at: order.created_at,
+    contact_method: order.contact_method,
+    customer_name_snapshot: [order.customer?.first_name, order.customer?.last_name].filter(Boolean).join(' ') || 'Customer',
+    customer_email_snapshot: order.customer?.email || null,
+    customer_phone_snapshot: order.customer?.phone || null,
+    send_status: 'not_sent',
+    sent_at: null,
+    sent_to: null,
+    items: order.items,
+    order: {
+      id: order.id,
+      order_number: order.order_number,
+      status: order.status,
+      payment_status: order.payment_status,
+      payment_method: order.payment_method,
+      paid_at: order.paid_at,
+      ordered_at: order.ordered_at,
+      shipped_at: order.shipped_at,
+      delivered_at: order.delivered_at,
+      estimated_delivery_date: order.estimated_delivery_date,
+      delayed_at: order.delayed_at,
+      cancelled_at: order.cancelled_at,
+      completed_at: order.completed_at,
+      updated_at: order.updated_at,
+    },
+    payment: order.payment,
+  }
 }
 
 type OperationsQueue = 'attention' | 'approval' | 'payment' | 'fulfillment' | 'all'
@@ -738,7 +791,12 @@ async function renderOperations(email: string) {
   })
 
   try {
-    const invoices = await listCoreInvoices()
+    const [invoices, orders] = await Promise.all([listCoreInvoices(), listCoreOrders()])
+    const invoicedOrderIds = new Set(invoices.map(invoice => invoice.order_id).filter(Boolean))
+    const missingInvoiceOrders = orders.filter(order =>
+      order.payment_status === 'paid' && !invoicedOrderIds.has(order.id)
+    )
+    const operations = [...invoices, ...missingInvoiceOrders.map(missingInvoiceEntry)]
 
     const waiting = invoices.filter(invoice => invoice.status === 'awaiting_approval')
     const ready = invoices.filter(invoice =>
@@ -749,12 +807,12 @@ async function renderOperations(email: string) {
     const paymentSubmitted = invoices.filter(invoice =>
       invoice.payment?.status === 'submitted'
     )
-    const paid = invoices.filter(invoice =>
+    const paid = operations.filter(invoice =>
       invoice.payment?.status === 'verified' ||
       invoice.order?.payment_status === 'paid'
     )
 
-    const visible = invoices.slice(0, 50)
+    const visible = operations.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 100)
     const invoiceById = new Map(visible.map(invoice => [invoice.id, invoice]))
 
     const stats = document.querySelector<HTMLDivElement>('#stats')
@@ -802,7 +860,7 @@ async function renderOperations(email: string) {
       }
       if (queue === 'fulfillment') return activeFulfillment
       if (queue === 'attention') {
-        return awaitingApproval || readyToSend || submittedPayment || delayed
+        return awaitingApproval || readyToSend || submittedPayment || delayed || invoice.status === 'missing_invoice'
       }
       return true
     }
